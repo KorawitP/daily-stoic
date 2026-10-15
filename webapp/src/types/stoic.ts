@@ -23,7 +23,7 @@ export interface StoicDay {
 }
 
 export type ReadingMode = 'journey' | 'calendar' | 'mood' | 'grid';
-export type AppTheme = 'parchment' | 'dark' | 'light';
+export type AppTheme = 'dark' | 'light';
 export type FontSize = 'sm' | 'md' | 'lg' | 'xl';
 
 export interface MoodCategoryInfo {
@@ -70,7 +70,7 @@ export interface UserProgress {
   favorites: number[]; // day IDs
   notes: Record<number, string>; // dayId -> personal reflection note
   theme: AppTheme;
-  fontSize: FontSize;
+  fontSize?: FontSize;
   readingMode: ReadingMode;
 }
 

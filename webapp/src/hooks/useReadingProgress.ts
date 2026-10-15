@@ -40,7 +40,7 @@ const DEFAULT_PROGRESS: UserProgress = {
   lastCheckInDate: '',
   favorites: [],
   notes: {},
-  theme: 'parchment',
+  theme: 'dark',
   fontSize: 'md',
   readingMode: 'journey',
 };
@@ -71,7 +71,7 @@ export function useReadingProgress() {
   // Apply theme to document root
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove('parchment', 'dark', 'light');
+    root.classList.remove('dark', 'light');
     root.classList.add(progress.theme);
   }, [progress.theme]);
 
@@ -260,7 +260,7 @@ export function useReadingProgress() {
         lastCheckInDate: typeof candidateProgress.lastCheckInDate === 'string' ? candidateProgress.lastCheckInDate : '',
         favorites,
         notes,
-        theme: ['parchment', 'dark', 'light'].includes(candidateProgress.theme) ? candidateProgress.theme : 'parchment',
+        theme: candidateProgress.theme === 'light' ? 'light' : 'dark',
         fontSize: ['sm', 'md', 'lg', 'xl'].includes(candidateProgress.fontSize) ? candidateProgress.fontSize : 'md',
         readingMode: ['journey', 'calendar', 'mood', 'grid'].includes(candidateProgress.readingMode) ? candidateProgress.readingMode : 'journey',
       };

@@ -9,7 +9,7 @@ import {
   Upload,
   RotateCcw,
 } from 'lucide-react';
-import type { StoicDay, AppTheme, FontSize } from '../types/stoic.ts';
+import type { StoicDay, AppTheme } from '../types/stoic.ts';
 import { getThemeClasses } from '../utils/theme.ts';
 
 interface MenuDrawerProps {
@@ -21,8 +21,6 @@ interface MenuDrawerProps {
   streak: number;
   favorites: number[];
   theme: AppTheme;
-  fontSize: FontSize;
-  onChangeFontSize: (size: FontSize) => void;
   onSelectDay: (dayId: number) => void;
   onExportBackup: () => void;
   onImportBackup: (file: File) => void;
@@ -49,8 +47,8 @@ const GREEK_TERMS = [
   { term: 'Apatheia (ἀπάθεια)', desc: 'ความเยือกเย็นที่ไม่ตกเป็นทาสของตัณหาและอารมณ์สุดโต่ง' },
   { term: 'Prohairesis (προαίρεσις)', desc: 'อำนาจการตัดสินใจเลือกอย่างมีเหตุผล เจตจำนงเสรีที่ไม่มีใครพรากไปได้' },
   { term: 'Logos (λόγος)', desc: 'เหตุผลและกฎระเบียบแห่งธรรมชาติอันเป็นแกนชี้นำจักรวาล' },
-  { term: 'Sympatheia (συμπάθεια)', desc: 'ความเชื่อมโยงถึงกันของมวลมนุษยชาติและสรรพสิ่งในเอกภพ' },
-  { term: 'Diairesis (διαίเรสิส)', desc: 'การแยกสิ่งที่ควบคุมได้ ออกจากสิ่งที่อยู่นอกเหนือการควบคุม' },
+  { term: 'Sympatheia (συμπ่าธεια)', desc: 'ความเชื่อมโยงถึงกันของมวลมนุษยชาติและสรรพสิ่งในเอกภพ' },
+  { term: 'Diairesis (διαίρεσις)', desc: 'การแยกสิ่งที่ควบคุมได้ ออกจากสิ่งที่อยู่นอกเหนือการควบคุม' },
 ];
 
 export const MenuDrawer: React.FC<MenuDrawerProps> = ({
@@ -62,8 +60,6 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
   streak,
   favorites,
   theme,
-  fontSize,
-  onChangeFontSize,
   onSelectDay,
   onExportBackup,
   onImportBackup,
@@ -147,8 +143,8 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
             onClick={() => { setActiveTab('toc'); setSelectedTopic(null); }}
             className={`py-2.5 border-b-2 font-medium transition-colors cursor-pointer ${
               activeTab === 'toc'
-                ? 'border-amber-600 text-amber-700 dark:text-amber-400 font-bold'
-                : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                ? 'border-yellow-400 text-yellow-400 font-bold'
+                : 'border-transparent text-stone-400 hover:text-stone-200'
             }`}
           >
             สารบัญ 366
@@ -157,8 +153,8 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
             onClick={() => setActiveTab('grid')}
             className={`py-2.5 border-b-2 font-medium transition-colors cursor-pointer ${
               activeTab === 'grid'
-                ? 'border-amber-600 text-amber-700 dark:text-amber-400 font-bold'
-                : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                ? 'border-yellow-400 text-yellow-400 font-bold'
+                : 'border-transparent text-stone-400 hover:text-stone-200'
             }`}
           >
             กำแพงอิฐ
@@ -167,8 +163,8 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
             onClick={() => setActiveTab('topics')}
             className={`py-2.5 border-b-2 font-medium transition-colors cursor-pointer ${
               activeTab === 'topics'
-                ? 'border-amber-600 text-amber-700 dark:text-amber-400 font-bold'
-                : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                ? 'border-yellow-400 text-yellow-400 font-bold'
+                : 'border-transparent text-stone-400 hover:text-stone-200'
             }`}
           >
             ยาใจสโตอิก
@@ -177,8 +173,8 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
             onClick={() => setActiveTab('wisdom')}
             className={`py-2.5 border-b-2 font-medium transition-colors cursor-pointer ${
               activeTab === 'wisdom'
-                ? 'border-amber-600 text-amber-700 dark:text-amber-400 font-bold'
-                : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                ? 'border-yellow-400 text-yellow-400 font-bold'
+                : 'border-transparent text-stone-400 hover:text-stone-200'
             }`}
           >
             อภิธานศัพท์
@@ -206,8 +202,8 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
                   onClick={() => setFilterFavorites(!filterFavorites)}
                   className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer whitespace-nowrap ${
                     filterFavorites
-                      ? 'bg-amber-600 text-white border-amber-600'
-                      : `${t.cardBorder} ${t.textSecondary}`
+                      ? 'bg-yellow-400 text-black border-yellow-400 font-semibold'
+                      : `${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary}`
                   }`}
                   title="แสดงเฉพาะรายการโปรด"
                 >
@@ -216,7 +212,7 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
               </div>
 
               {selectedTopic && (
-                <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-300">
+                <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-yellow-400/10 text-yellow-400 border border-yellow-400/20">
                   <span>กำลังกรองตามหมวด: {TOPIC_CATEGORIES.find(c => c.id === selectedTopic)?.title}</span>
                   <button
                     onClick={() => setSelectedTopic(null)}
@@ -243,13 +239,13 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
                         }}
                         className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                           isCurrent
-                            ? 'border-amber-600/60 bg-amber-500/15 font-medium'
+                            ? 'border-yellow-400/60 bg-yellow-400/10 font-medium'
                             : `${t.appBg} ${t.cardBorder} hover:${t.cardBgHover}`
                         }`}
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-mono">
-                            <span className={isCurrent ? 'text-amber-700 dark:text-amber-400 font-bold' : ''}>
+                          <div className="flex items-center gap-1.5 text-[11px] text-stone-400 font-mono">
+                            <span className={isCurrent ? 'text-yellow-400 font-bold' : ''}>
                               ก้าวที่ {d.dayStep}
                             </span>
                             <span>•</span>
@@ -265,7 +261,7 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
 
                         <div className="flex items-center gap-1.5 shrink-0">
                           {isCompleted && (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <CheckCircle2 className="w-4 h-4 text-yellow-400" />
                           )}
                           <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
                         </div>
@@ -284,9 +280,9 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
           {/* TAB 2: Brick Grid */}
           {activeTab === 'grid' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-stone-500 pb-2 border-b border-stone-500/15">
+              <div className="flex items-center justify-between text-xs text-stone-400 pb-2 border-b border-stone-500/15">
                 <span>ก่อแล้ว {readCount} จาก 366 ก้อน</span>
-                <span className="flex items-center gap-1 font-mono text-amber-600">
+                <span className="flex items-center gap-1 font-mono text-yellow-400">
                   <Flame className="w-3.5 h-3.5 fill-current" /> {streak} วันต่อเนื่อง
                 </span>
               </div>
@@ -306,10 +302,10 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
                       }}
                       className={`aspect-square rounded-xs text-[8px] font-mono transition-all cursor-pointer ${
                         isCompleted
-                          ? 'bg-amber-700 dark:bg-amber-500 text-white'
+                          ? 'bg-yellow-400 text-black font-semibold'
                           : isCurrent
-                          ? 'border border-amber-600 bg-amber-500/30 text-amber-900 dark:text-amber-200 font-bold'
-                          : 'bg-stone-300/50 dark:bg-stone-800/60 hover:bg-stone-400'
+                          ? 'border border-yellow-400 bg-yellow-400/20 text-yellow-400 font-bold'
+                          : 'bg-stone-800 hover:bg-stone-700 text-stone-400'
                       }`}
                       title={`ก้าวที่ ${d.dayStep}: ${d.titleTh}`}
                     >
@@ -324,7 +320,7 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
           {/* TAB 3: Stoic Topics (First-Aid) */}
           {activeTab === 'topics' && (
             <div className="space-y-2">
-              <p className="text-xs text-stone-500 leading-relaxed font-sans-thai mb-3">
+              <p className="text-xs text-stone-400 leading-relaxed font-sans-thai mb-3">
                 เลือกสภาวะอารมณ์ที่คุณกำลังเผชิญ เพื่อเปิดรับบทเรียนที่ตรงกับปัญหาใจของคุณที่สุด:
               </p>
               {TOPIC_CATEGORIES.map(cat => {
@@ -340,7 +336,7 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
                     className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${t.appBg} ${t.cardBorder} hover:${t.cardBgHover}`}
                   >
                     <div>
-                      <div className="flex items-center gap-1.5 text-xs font-serif-thai font-bold text-amber-800 dark:text-amber-300">
+                      <div className="flex items-center gap-1.5 text-xs font-serif-thai font-bold text-yellow-400">
                         <span>{cat.icon}</span>
                         <span>{cat.title}</span>
                       </div>
@@ -360,12 +356,12 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
           {/* TAB 4: Stoic Wisdom & Greek Glossary */}
           {activeTab === 'wisdom' && (
             <div className="space-y-3">
-              <div className="text-xs text-stone-500 font-sans-thai mb-2">
+              <div className="text-xs text-stone-400 font-sans-thai mb-2">
                 คำสำคัญและหลักการฝึกฝนของชาวสโตอิก:
               </div>
               {GREEK_TERMS.map((term, idx) => (
                 <div key={idx} className={`p-3 rounded-lg border text-xs ${t.appBg} ${t.cardBorder}`}>
-                  <div className="font-serif-thai font-bold text-amber-800 dark:text-amber-400 mb-0.5">
+                  <div className="font-serif-thai font-bold text-yellow-400 mb-0.5">
                     {term.term}
                   </div>
                   <div className={`text-[11px] ${t.textSecondary} leading-relaxed`}>
@@ -379,23 +375,9 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
 
         {/* Drawer Footer Tools */}
         <div className={`p-3 border-t text-xs flex items-center justify-between gap-2 ${t.navBg}`}>
-          {/* Font size adjuster */}
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] text-stone-400">ขนาด:</span>
-            {(['sm', 'md', 'lg', 'xl'] as FontSize[]).map(sz => (
-              <button
-                key={sz}
-                onClick={() => onChangeFontSize(sz)}
-                className={`px-1.5 py-0.5 rounded-sm text-[11px] font-mono cursor-pointer ${
-                  fontSize === sz
-                    ? 'bg-amber-600 text-white font-bold'
-                    : 'text-stone-400 hover:text-stone-700'
-                }`}
-              >
-                {sz.toUpperCase()}
-              </button>
-            ))}
-          </div>
+          <span className="text-[11px] text-stone-400 font-sans-thai">
+            สำรอง & กู้คืนข้อมูล (JSON)
+          </span>
 
           {/* Backup / Export */}
           <div className="flex items-center gap-1.5">
@@ -414,14 +396,14 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
             />
             <button
               onClick={onExportBackup}
-              className={`p-1.5 rounded-md border text-stone-400 hover:${t.textPrimary} ${t.cardBorder} cursor-pointer`}
+              className={`p-1.5 rounded-md border text-stone-400 hover:text-yellow-400 ${t.cardBorder} cursor-pointer transition-colors`}
               title="ส่งออกข้อมูลสำรอง (Backup JSON)"
             >
               <Download className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className={`p-1.5 rounded-md border text-stone-400 hover:${t.textPrimary} ${t.cardBorder} cursor-pointer`}
+              className={`p-1.5 rounded-md border text-stone-400 hover:text-yellow-400 ${t.cardBorder} cursor-pointer transition-colors`}
               title="นำเข้าข้อมูลสำรอง (Import JSON)"
             >
               <Upload className="w-3.5 h-3.5" />
@@ -432,7 +414,7 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
                   onResetProgress();
                 }
               }}
-              className={`p-1.5 rounded-md border text-stone-400 hover:text-rose-500 ${t.cardBorder} cursor-pointer`}
+              className={`p-1.5 rounded-md border text-stone-400 hover:text-yellow-400 ${t.cardBorder} cursor-pointer transition-colors`}
               title="รีเซ็ตความคืบหน้า"
             >
               <RotateCcw className="w-3.5 h-3.5" />

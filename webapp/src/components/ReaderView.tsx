@@ -11,13 +11,12 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import type { StoicDay, AppTheme, FontSize } from '../types/stoic.ts';
-import { getThemeClasses, getFontSizeClass } from '../utils/theme.ts';
+import type { StoicDay, AppTheme } from '../types/stoic.ts';
+import { getThemeClasses } from '../utils/theme.ts';
 
 interface ReaderViewProps {
   day: StoicDay;
   theme: AppTheme;
-  fontSize: FontSize;
   isRead: boolean;
   onToggleRead: () => void;
   isFavorite: boolean;
@@ -34,7 +33,6 @@ interface ReaderViewProps {
 export const ReaderView: React.FC<ReaderViewProps> = ({
   day,
   theme,
-  fontSize,
   isRead,
   onToggleRead,
   isFavorite,
@@ -48,7 +46,6 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   disabledKeyboardShortcuts,
 }) => {
   const t = getThemeClasses(theme);
-  const fontStyle = getFontSizeClass(fontSize);
 
   const [showCalendarDate, setShowCalendarDate] = useState(false);
   const [showJournal, setShowJournal] = useState(Boolean(savedNote));
@@ -136,9 +133,9 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   return (
     <article className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       {/* 1. Quiet Meta Line: Step & Theme */}
-      <div className="flex items-center justify-between text-xs text-stone-500 font-sans-thai mb-6 pb-2 border-b border-stone-500/10">
+      <div className="flex items-center justify-between text-xs text-stone-400 font-sans-thai mb-6 pb-2 border-b border-stone-500/10">
         <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-amber-700 dark:text-amber-400">
+          <span className="font-mono font-bold text-yellow-400">
             ก้าวที่ {day.dayStep}
           </span>
           <span>•</span>
@@ -160,7 +157,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
       {/* 2. Titles */}
       <header className="mb-8 sm:mb-10">
-        <h1 className={`font-serif-thai font-bold ${fontStyle.title} leading-tight mb-2 ${t.textPrimary}`}>
+        <h1 className={`font-serif-thai font-bold text-2xl sm:text-3xl leading-tight mb-2 ${t.textPrimary}`}>
           {day.titleTh}
         </h1>
         <p className={`font-serif italic text-sm sm:text-base ${t.textMuted}`}>
@@ -170,14 +167,14 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
       {/* 3. Quote Block (Classic Book Style) */}
       <section className={`relative my-8 sm:my-10 p-6 sm:p-8 rounded-xl border-l-3 transition-colors ${t.quoteBoxBg} ${t.quoteBoxBorder}`}>
-        <Quote className="absolute top-4 right-4 w-6 h-6 opacity-15 text-amber-700 dark:text-amber-400 pointer-events-none" />
+        <Quote className="absolute top-4 right-4 w-6 h-6 opacity-20 text-yellow-400 pointer-events-none" />
 
         <blockquote className="relative z-10">
-          <p className={`font-serif-thai italic font-medium ${fontStyle.quote} ${t.textPrimary} mb-4 leading-relaxed`}>
+          <p className={`font-serif-thai italic font-medium text-lg sm:text-xl ${t.textPrimary} mb-4 leading-relaxed`}>
             &ldquo;{day.quote}&rdquo;
           </p>
 
-          <footer className="pt-2 text-xs sm:text-sm font-sans-thai text-amber-800 dark:text-amber-400">
+          <footer className="pt-2 text-xs sm:text-sm font-sans-thai text-yellow-400">
             — {day.author}
             {day.source && (
               <span className={`block sm:inline sm:ml-1.5 font-normal italic ${t.textSecondary}`}>
@@ -193,7 +190,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         {day.paragraphs.map((para, idx) => (
           <p
             key={idx}
-            className={`font-sans-thai ${fontStyle.body} ${t.textPrimary} tracking-normal break-words`}
+            className={`font-sans-thai text-base sm:text-lg leading-relaxed sm:leading-loose ${t.textPrimary} tracking-normal break-words`}
           >
             {para}
           </p>
@@ -201,19 +198,19 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       </section>
 
       {/* 5. End of Meditation: Calm Check-in & Actions */}
-      <div className={`mt-12 pt-6 border-t border-stone-500/15 flex flex-col gap-5`}>
+      <div className="mt-12 pt-6 border-t border-stone-500/15 flex flex-col gap-5">
         <div className="flex items-center justify-between gap-3">
           {/* Calm Check-in Button */}
           <button
             onClick={onToggleRead}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition-all duration-150 cursor-pointer ${
               isRead
-                ? 'bg-emerald-600/15 text-emerald-800 dark:text-emerald-300 border-emerald-600/40'
+                ? 'bg-yellow-400/10 text-yellow-400 border-yellow-400/30'
                 : `${t.cardBg} ${t.cardBorder} hover:${t.cardBgHover} ${t.textPrimary}`
             }`}
           >
             {isRead ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 fill-emerald-600/20" />
+              <CheckCircle2 className="w-4 h-4 text-yellow-400 fill-yellow-400/20" />
             ) : (
               <Circle className="w-4 h-4 text-stone-400" />
             )}
@@ -225,7 +222,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
             onClick={onToggleFavorite}
             className={`p-2.5 rounded-xl border transition-colors cursor-pointer ${
               isFavorite
-                ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/40'
+                ? 'bg-yellow-400/20 text-yellow-400 border-yellow-400/40'
                 : `${t.cardBorder} text-stone-400 hover:${t.textPrimary}`
             }`}
             title={isFavorite ? 'นำออกจากรายการโปรด' : 'บันทึกเป็นรายการโปรด'}
@@ -239,20 +236,20 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
           {!showJournal ? (
             <button
               onClick={() => setShowJournal(true)}
-              className="text-xs text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 flex items-center gap-1.5 cursor-pointer font-sans-thai transition-colors"
+              className="text-xs text-stone-400 hover:text-yellow-400 flex items-center gap-1.5 cursor-pointer font-sans-thai transition-colors"
             >
               <PenLine className="w-3.5 h-3.5" />
               <span>+ เขียนบันทึกสะท้อนคิดประจำวัน</span>
             </button>
           ) : (
             <div className="space-y-2 mt-2">
-              <div className="flex items-center justify-between text-xs text-stone-500">
-                <span className="font-semibold flex items-center gap-1.5">
-                  <PenLine className="w-3 h-3 text-amber-600" />
+              <div className="flex items-center justify-between text-xs text-stone-400">
+                <span className="font-semibold flex items-center gap-1.5 text-stone-300">
+                  <PenLine className="w-3 h-3 text-yellow-400" />
                   บันทึกสะท้อนคิดยามค่ำ (บันทึกออฟไลน์ในเครื่อง)
                 </span>
                 {isNoteSaved && (
-                  <span className="text-[11px] text-emerald-600 flex items-center gap-0.5">
+                  <span className="text-[11px] text-yellow-400 flex items-center gap-0.5">
                     <Check className="w-3 h-3" /> บันทึกแล้ว
                   </span>
                 )}
@@ -263,7 +260,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                 onBlur={handleNoteBlur}
                 placeholder="คุณได้เรียนรู้อะไรจากบทเรียนนี้ และจะนำไปปรับใช้ในชีวิตจริงอย่างไร?..."
                 rows={3}
-                className={`w-full p-3 rounded-xl border text-xs sm:text-sm font-sans-thai resize-y focus:outline-hidden focus:ring-1 focus:ring-amber-500/40 ${t.appBg} ${t.cardBorder} ${t.textPrimary}`}
+                className={`w-full p-3 rounded-xl border text-xs sm:text-sm font-sans-thai resize-y focus:outline-hidden focus:ring-1 focus:ring-yellow-400/40 ${t.appBg} ${t.cardBorder} ${t.textPrimary}`}
               />
             </div>
           )}

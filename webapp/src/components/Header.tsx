@@ -3,7 +3,6 @@ import {
   Menu,
   Sun,
   Moon,
-  Scroll,
   Flame,
 } from 'lucide-react';
 import type { AppTheme } from '../types/stoic.ts';
@@ -30,42 +29,35 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const t = getThemeClasses(theme);
 
-  const cycleTheme = () => {
-    if (theme === 'parchment') onChangeTheme('dark');
-    else if (theme === 'dark') onChangeTheme('light');
-    else onChangeTheme('parchment');
+  const toggleTheme = () => {
+    onChangeTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   return (
     <header className={`sticky top-0 z-30 border-b transition-colors duration-200 ${t.navBg}`}>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        {/* Brand */}
+        {/* Brand without logo */}
         <div
           onClick={onResetToCurrentDay}
-          className="flex items-center gap-2.5 cursor-pointer select-none group"
+          className="flex items-center cursor-pointer select-none group"
           title="The Daily Stoic (366 วันแห่งปัญญา)"
         >
-          <div className="w-7 h-7 rounded-full bg-amber-600/15 text-amber-700 dark:text-amber-400 flex items-center justify-center font-serif font-bold text-sm border border-amber-600/30">
-            Σ
-          </div>
-          <div>
-            <span className="font-serif-thai font-bold text-sm sm:text-base tracking-wider leading-none group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors">
-              THE DAILY STOIC
-            </span>
-          </div>
+          <span className={`font-serif-thai font-bold text-sm sm:text-base tracking-wider leading-none transition-colors group-hover:text-yellow-400 ${t.textPrimary}`}>
+            THE DAILY STOIC
+          </span>
         </div>
 
-        {/* Center / Right Quiet Status & Actions */}
+        {/* Center / Right Status & Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Subtle Progress / Streak */}
-          <div className="flex items-center gap-2 text-xs text-stone-500 font-mono">
+          <div className="flex items-center gap-2 text-xs text-stone-400 font-mono">
             {streak > 0 && (
-              <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400 font-semibold" title={`อ่านต่อเนื่อง ${streak} วันติด`}>
+              <span className="flex items-center gap-0.5 text-yellow-400 font-semibold" title={`อ่านต่อเนื่อง ${streak} วันติด`}>
                 <Flame className="w-3.5 h-3.5 fill-current" />
                 <span>{streak}</span>
               </span>
             )}
-            <span className="hidden xs:inline text-stone-400">•</span>
+            <span className="hidden xs:inline text-stone-500">•</span>
             <span title={`อ่านแล้ว ${readCount}/366 ก้าว`}>
               ก้าวที่ {currentDayStep}
             </span>
@@ -73,19 +65,15 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Theme switcher */}
           <button
-            onClick={cycleTheme}
-            className={`p-1.5 rounded-lg border text-stone-500 hover:${t.textPrimary} transition-colors cursor-pointer ${t.cardBorder}`}
-            title={`เปลี่ยนธีม (ปัจจุบัน: ${
-              theme === 'parchment' ? 'กระดาษโบราณ' : theme === 'dark' ? 'มืดสโตอิก' : 'สว่าง'
-            })`}
+            onClick={toggleTheme}
+            className={`p-1.5 rounded-lg border text-stone-400 hover:${t.textPrimary} transition-colors cursor-pointer ${t.cardBorder}`}
+            title={`เปลี่ยนธีม (ปัจจุบัน: ${theme === 'dark' ? 'โหมดมืด (Dark)' : 'โหมดสว่าง (Light)'})`}
             aria-label="เปลี่ยนธีม"
           >
-            {theme === 'parchment' ? (
-              <Scroll className="w-4 h-4 text-amber-800" />
-            ) : theme === 'dark' ? (
-              <Moon className="w-4 h-4 text-amber-300" />
+            {theme === 'dark' ? (
+              <Moon className="w-4 h-4 text-yellow-400" />
             ) : (
-              <Sun className="w-4 h-4 text-amber-600" />
+              <Sun className="w-4 h-4 text-yellow-500" />
             )}
           </button>
 

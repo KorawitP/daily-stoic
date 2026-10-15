@@ -20,7 +20,6 @@ export function App() {
     saveNote,
     getNote,
     setTheme,
-    setFontSize,
     setCurrentJourneyDay,
     readCount,
     exportData,
@@ -129,7 +128,6 @@ export function App() {
           key={currentDay.id}
           day={currentDay}
           theme={progress.theme}
-          fontSize={progress.fontSize}
           isRead={isRead(currentDay.id)}
           onToggleRead={() => {
             const nowRead = toggleRead(currentDay.id);
@@ -159,8 +157,6 @@ export function App() {
         streak={progress.streak}
         favorites={progress.favorites}
         theme={progress.theme}
-        fontSize={progress.fontSize}
-        onChangeFontSize={setFontSize}
         onSelectDay={handleSelectDay}
         onExportBackup={handleExportBackup}
         onImportBackup={handleImportBackup}
