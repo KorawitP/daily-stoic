@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+webapp/node_modules/
+
+# Build outputs
+webapp/dist/
+webapp/.tmp/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
