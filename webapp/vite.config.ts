@@ -12,11 +12,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'The Daily Stoic (ฉบับแปลไทย)',
-        short_name: 'Daily Stoic',
-        description: '366 วันแห่งปัญญาและการใช้ชีวิต — ปรัชญาสโตอิกสำหรับทุกวัน',
-        theme_color: '#1c1917',
-        background_color: '#0c0a09',
+        name: 'คลังหนังสือปัญญา (Personal Wisdom Library)',
+        short_name: 'คลังปัญญา',
+        description: 'คลังหนังสือปัญญาฉบับแปลไทย: The Daily Stoic & วิธีชนะมิตรและจูงใจคน',
+        theme_color: '#0a0a0a',
+        background_color: '#0a0a0a',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/daily-stoic/',
@@ -35,11 +35,12 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}']
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
       }
     })
   ],
   build: {
-    chunkSizeWarningLimit: 2500,
+    chunkSizeWarningLimit: 5000,
   }
 })

@@ -267,5 +267,30 @@ assert.ok(chars > 50, 'Character count must be accurate');
 assert.ok(words > 0, 'Word count must be positive');
 console.log(`✓ Thai text counted: ${words} words, ${chars} characters.`);
 
+// Test 7: How to Win Friends and Influence People Data Integrity
+console.log('[7/7] Verifying How to Win Friends and Influence People (30 Chapters & Meta)...');
+const carnegieDataPath = path.resolve('./src/data/how_to_win_friends.json');
+const carnegieMetaPath = path.resolve('./src/data/carnegie_meta.json');
+const carnegieChapters = JSON.parse(fs.readFileSync(carnegieDataPath, 'utf8'));
+const carnegieMeta = JSON.parse(fs.readFileSync(carnegieMetaPath, 'utf8'));
+
+assert.strictEqual(carnegieChapters.length, 30, 'Must contain exactly 30 chapters');
+assert.strictEqual(carnegieMeta.principles.length, 30, 'Must contain 30 principles in meta');
+assert.strictEqual(carnegieMeta.parts.length, 4, 'Must contain 4 parts in meta');
+assert.ok(carnegieMeta.prefaceAndSuggestions.length > 5000, 'Preface and 9 suggestions must be present');
+assert.ok(carnegieMeta.biographyAndSummary.length > 5000, 'Biography and summary must be present');
+
+carnegieChapters.forEach((ch: any, idx: number) => {
+  const expectedId = idx + 1;
+  assert.strictEqual(ch.id, expectedId, `Carnegie chapter id mismatch at ${idx}`);
+  assert.strictEqual(ch.dayStep, expectedId, `Carnegie chapter step mismatch at ${idx}`);
+  assert.ok(ch.titleTh && ch.titleTh.length > 0, `Missing titleTh for chapter ${ch.id}`);
+  assert.ok(ch.titleEn && ch.titleEn.length > 0, `Missing titleEn for chapter ${ch.id}`);
+  assert.ok(ch.quote && ch.quote.length > 0, `Missing principle quote for chapter ${ch.id}`);
+  assert.ok(Array.isArray(ch.paragraphs) && ch.paragraphs.length >= 10, `Too few paragraphs for chapter ${ch.id}`);
+});
+console.log('✓ 30 chapters of How to Win Friends and Influence People verified cleanly.');
+
 console.log('--------------------------------------------------');
-console.log('ALL TESTS PASSED SUCCESSFULLY! (6/6 suites passing)');
+console.log('ALL TESTS PASSED SUCCESSFULLY! (7/7 suites passing)');
+

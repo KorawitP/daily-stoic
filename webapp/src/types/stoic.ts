@@ -1,3 +1,5 @@
+export type BookId = 'daily-stoic' | 'how-to-win-friends';
+
 export interface StoicDay {
   id: number;
   dayStep: number;
@@ -58,12 +60,52 @@ export interface BookMeta {
   glossary: string;
 }
 
+export interface CarnegiePartInfo {
+  num: number;
+  id: string;
+  name_th: string;
+  name_en: string;
+  theme_th: string;
+  theme_en: string;
+  chapters: number;
+}
+
+export interface CarnegiePrincipleInfo {
+  id: number;
+  partNumber: number;
+  partNameTh: string;
+  partThemeTh: string;
+  chapterTitleTh: string;
+  chapterTitleEn: string;
+  principleTh: string;
+  principleEn: string;
+}
+
+export interface CarnegieMeta {
+  bookId: BookId;
+  bookTitleTh: string;
+  bookTitleEn: string;
+  authors: string;
+  totalDays: number;
+  parts: CarnegiePartInfo[];
+  principles: CarnegiePrincipleInfo[];
+  prefaceAndSuggestions: string;
+  biographyAndSummary: string;
+}
+
 export interface DayProgress {
   completedAt: string; // ISO string
 }
 
+export interface BookProgressState {
+  readDays: Record<number, DayProgress>;
+  currentJourneyDay: number;
+  favorites: number[];
+  notes: Record<number, string>;
+}
+
 export interface UserProgress {
-  readDays: Record<number, DayProgress>; // dayId -> progress
+  readDays: Record<number, DayProgress>; // dayId -> progress (active book or daily-stoic legacy)
   currentJourneyDay: number;
   streak: number;
   lastCheckInDate: string; // YYYY-MM-DD
@@ -78,7 +120,9 @@ export interface BackupData {
   version: string;
   exportedAt: string;
   app: string;
+  activeBookId?: BookId;
   progress: UserProgress;
+  carnegieProgress?: BookProgressState;
 }
 
 export interface ReflectionItem {
@@ -90,4 +134,3 @@ export interface ReflectionItem {
   quote: string;
   note: string;
 }
-

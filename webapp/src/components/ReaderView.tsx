@@ -11,11 +11,14 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import type { StoicDay, AppTheme } from '../types/stoic.ts';
+import type { StoicDay, AppTheme, BookId } from '../types/stoic.ts';
 import { getThemeClasses } from '../utils/theme.ts';
+import { renderInlineMarkdown } from '../utils/markdown.tsx';
 
 interface ReaderViewProps {
   day: StoicDay;
+  activeBookId: BookId;
+  unitLabel: string;
   theme: AppTheme;
   isRead: boolean;
   onToggleRead: () => void;
@@ -30,8 +33,11 @@ interface ReaderViewProps {
   disabledKeyboardShortcuts?: boolean;
 }
 
+
 export const ReaderView: React.FC<ReaderViewProps> = ({
   day,
+  activeBookId,
+  unitLabel,
   theme,
   isRead,
   onToggleRead,
@@ -83,7 +89,6 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     if (disabledKeyboardShortcuts) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't hijack browser shortcuts like Ctrl+C, Ctrl+R, Ctrl+F
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       const target = e.target as HTMLElement;
@@ -130,29 +135,112 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     setTimeout(() => setIsNoteSaved(false), 2000);
   };
 
+  const renderParagraphBlock = (para: string, idx: number) => {
+    const trimmed = para.trim();
+
+    // 1. Subheading (### ...)
+    if (trimmed.startsWith('### ')) {
+      const headingText = trimmed.replace(/^###\s+/, '');
+      return (
+        <h2
+          key={idx}
+          className={`font-serif-thai font-bold text-lg sm:text-xl pt-4 pb-1 border-b border-yellow-400/20 text-yellow-400`}
+        >
+          {renderInlineMarkdown(headingText)}
+        </h2>
+      );
+    }
+
+    // 2. Principle Pin Highlight Box (📌 ...)
+    if (trimmed.startsWith('📌')) {
+      return (
+        <div
+          key={idx}
+          className={`p-5 sm:p-6 rounded-xl border-2 border-yellow-400 ${t.quoteBoxBg} my-6`}
+        >
+          <p className={`font-serif-thai text-base sm:text-lg leading-relaxed font-semibold ${t.textPrimary}`}>
+            {renderInlineMarkdown(trimmed)}
+          </p>
+        </div>
+      );
+    }
+
+    // 3. Blockquote (> ...)
+    if (trimmed.startsWith('> ')) {
+      const lines = trimmed
+        .split('\n')
+        .map(line => line.replace(/^>\s?/, '').trim())
+        .filter(Boolean);
+      return (
+        <blockquote
+          key={idx}
+          className={`pl-4 sm:pl-5 py-3 pr-4 my-4 border-l-3 border-yellow-400 rounded-r-xl ${t.quoteBoxBg} font-serif-thai italic text-base sm:text-lg leading-relaxed ${t.textPrimary} space-y-2`}
+        >
+          {lines.map((l, i) => (
+            <p key={i}>{renderInlineMarkdown(l)}</p>
+          ))}
+        </blockquote>
+      );
+    }
+
+    // 4. Multi-line Bullet or Numbered List
+    const lines = trimmed.split('\n');
+    if (lines.length > 1 && lines.every(l => /^(\*|-|\d+\.)\s+/.test(l.trim()))) {
+      return (
+        <ul key={idx} className="space-y-2 pl-5 list-disc marker:text-yellow-400">
+          {lines.map((l, i) => {
+            const cleanItem = l.trim().replace(/^(\*|-|\d+\.)\s+/, '');
+            return (
+              <li
+                key={i}
+                className={`font-sans-thai text-base sm:text-lg leading-relaxed ${t.textPrimary}`}
+              >
+                {renderInlineMarkdown(cleanItem)}
+              </li>
+            );
+          })}
+        </ul>
+      );
+    }
+
+    // 5. Standard Narrative Paragraph (with support for line breaks)
+    return (
+      <p
+        key={idx}
+        className={`font-sans-thai text-base sm:text-lg leading-relaxed sm:leading-loose ${t.textPrimary} tracking-normal break-words whitespace-pre-line`}
+      >
+        {renderInlineMarkdown(trimmed)}
+      </p>
+    );
+  };
+
   return (
     <article className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       {/* 1. Quiet Meta Line: Step & Theme */}
-      <div className="flex items-center justify-between text-xs text-stone-400 font-sans-thai mb-6 pb-2 border-b border-stone-500/10">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-stone-400 font-sans-thai mb-6 pb-2 border-b border-stone-500/10">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono font-bold text-yellow-400">
-            ก้าวที่ {day.dayStep}
+            {unitLabel}ที่ {day.dayStep}
           </span>
           <span>•</span>
-          <span>{day.disciplineTh}</span>
-          <span>•</span>
-          <span>{day.monthThemeTh}</span>
+          <span>{day.monthNameTh}: {day.monthThemeTh}</span>
         </div>
 
-        {/* Subtle date toggle (No pressure) */}
-        <button
-          onClick={() => setShowCalendarDate(!showCalendarDate)}
-          className={`text-[11px] text-stone-400 hover:${t.textSecondary} flex items-center gap-1 cursor-pointer transition-colors`}
-          title="ดูวันที่ปฏิทินสากล"
-        >
-          {showCalendarDate ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-          <span>{showCalendarDate ? day.dateLabel : 'ดูวันที่'}</span>
-        </button>
+        {/* Subtle date toggle for Daily Stoic, or Part badge for Carnegie */}
+        {activeBookId === 'daily-stoic' ? (
+          <button
+            onClick={() => setShowCalendarDate(!showCalendarDate)}
+            className={`text-[11px] text-stone-400 hover:${t.textSecondary} flex items-center gap-1 cursor-pointer transition-colors`}
+            title="ดูวันที่ปฏิทินสากล"
+          >
+            {showCalendarDate ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            <span>{showCalendarDate ? day.dateLabel : 'ดูวันที่'}</span>
+          </button>
+        ) : (
+          <span className="text-[11px] font-mono text-yellow-400">
+            {day.dateLabel}
+          </span>
+        )}
       </div>
 
       {/* 2. Titles */}
@@ -165,11 +253,16 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         </p>
       </header>
 
-      {/* 3. Quote Block (Classic Book Style) */}
+      {/* 3. Quote / Core Principle Block (Classic Book Style) */}
       <section className={`relative my-8 sm:my-10 p-6 sm:p-8 rounded-xl border-l-3 transition-colors ${t.quoteBoxBg} ${t.quoteBoxBorder}`}>
         <Quote className="absolute top-4 right-4 w-6 h-6 opacity-20 text-yellow-400 pointer-events-none" />
 
         <blockquote className="relative z-10">
+          {activeBookId === 'how-to-win-friends' && (
+            <div className="text-xs font-mono uppercase tracking-wider text-yellow-400 font-bold mb-2">
+              แก่นสำคัญประจำบท (Core Principle)
+            </div>
+          )}
           <p className={`font-serif-thai italic font-medium text-lg sm:text-xl ${t.textPrimary} mb-4 leading-relaxed`}>
             &ldquo;{day.quote}&rdquo;
           </p>
@@ -187,17 +280,10 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
       {/* 4. Full Uncut Translation Body */}
       <section className="space-y-6 my-8 sm:my-10 text-left">
-        {day.paragraphs.map((para, idx) => (
-          <p
-            key={idx}
-            className={`font-sans-thai text-base sm:text-lg leading-relaxed sm:leading-loose ${t.textPrimary} tracking-normal break-words`}
-          >
-            {para}
-          </p>
-        ))}
+        {day.paragraphs.map((para, idx) => renderParagraphBlock(para, idx))}
       </section>
 
-      {/* 5. End of Meditation: Calm Check-in & Actions */}
+      {/* 5. End of Chapter / Meditation: Calm Check-in & Actions */}
       <div className="mt-12 pt-6 border-t border-stone-500/15 flex flex-col gap-5">
         <div className="flex items-center justify-between gap-3">
           {/* Calm Check-in Button */}
@@ -214,7 +300,11 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
             ) : (
               <Circle className="w-4 h-4 text-stone-400" />
             )}
-            <span>{isRead ? 'อ่านจบแล้ววันนี้' : 'ทำเครื่องหมายว่าอ่านแล้ว'}</span>
+            <span>
+              {isRead
+                ? `อ่านจบ${unitLabel}นี้แล้ว`
+                : `ทำเครื่องหมายว่าอ่านจบ${unitLabel}นี้แล้ว`}
+            </span>
           </button>
 
           {/* Bookmark Button */}
@@ -231,7 +321,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
           </button>
         </div>
 
-        {/* Evening Reflection (Discreet expandable text) */}
+        {/* Personal Reflection */}
         <div>
           {!showJournal ? (
             <button
@@ -239,14 +329,14 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               className="text-xs text-stone-400 hover:text-yellow-400 flex items-center gap-1.5 cursor-pointer font-sans-thai transition-colors"
             >
               <PenLine className="w-3.5 h-3.5" />
-              <span>+ เขียนบันทึกสะท้อนคิดประจำวัน</span>
+              <span>+ เขียนบันทึกสะท้อนคิดจากการอ่าน{unitLabel}นี้</span>
             </button>
           ) : (
             <div className="space-y-2 mt-2">
               <div className="flex items-center justify-between text-xs text-stone-400">
                 <span className="font-semibold flex items-center gap-1.5 text-stone-300">
                   <PenLine className="w-3 h-3 text-yellow-400" />
-                  บันทึกสะท้อนคิดยามค่ำ (บันทึกออฟไลน์ในเครื่อง)
+                  บันทึกสะท้อนคิดส่วนตัว (บันทึกออฟไลน์ในเครื่อง)
                 </span>
                 {isNoteSaved && (
                   <span className="text-[11px] text-yellow-400 flex items-center gap-0.5">
@@ -258,7 +348,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                 value={noteText}
                 onChange={handleNoteChange}
                 onBlur={handleNoteBlur}
-                placeholder="คุณได้เรียนรู้อะไรจากบทเรียนนี้ และจะนำไปปรับใช้ในชีวิตจริงอย่างไร?..."
+                placeholder="คุณได้เรียนรู้อะไรจากบทเรียนนี้ และจะนำไปปรับใช้กับผู้คนหรือชีวิตจริงอย่างไร?..."
                 rows={3}
                 className={`w-full p-3 rounded-xl border text-xs sm:text-sm font-sans-thai resize-y focus:outline-hidden focus:ring-1 focus:ring-yellow-400/40 ${t.appBg} ${t.cardBorder} ${t.textPrimary}`}
               />
@@ -278,7 +368,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
             }`}
           >
             <ChevronLeft className="w-4 h-4" />
-            <span>ก้าวที่ {day.dayStep - 1}</span>
+            <span>{unitLabel}ที่ {day.dayStep - 1}</span>
           </button>
 
           <button
@@ -290,7 +380,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                 : 'opacity-30 cursor-not-allowed border-transparent text-stone-400'
             }`}
           >
-            <span>ก้าวที่ {day.dayStep + 1}</span>
+            <span>{unitLabel}ที่ {day.dayStep + 1}</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </nav>

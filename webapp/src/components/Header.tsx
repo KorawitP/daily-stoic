@@ -4,28 +4,36 @@ import {
   Sun,
   Moon,
   Flame,
+  BookOpen,
+  ChevronDown,
 } from 'lucide-react';
-import type { AppTheme } from '../types/stoic.ts';
+import type { AppTheme, BookId } from '../types/stoic.ts';
 import { getThemeClasses } from '../utils/theme.ts';
 
 interface HeaderProps {
+  activeBookId: BookId;
   currentDayStep: number;
   readCount: number;
+  totalUnits: number;
+  unitLabel: string;
   streak: number;
   theme: AppTheme;
   onChangeTheme: (theme: AppTheme) => void;
   onOpenMenu: () => void;
-  onResetToCurrentDay?: () => void;
+  onOpenBookShelf: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
+  activeBookId,
   currentDayStep,
   readCount,
+  totalUnits,
+  unitLabel,
   streak,
   theme,
   onChangeTheme,
   onOpenMenu,
-  onResetToCurrentDay,
+  onOpenBookShelf,
 }) => {
   const t = getThemeClasses(theme);
 
@@ -33,22 +41,29 @@ export const Header: React.FC<HeaderProps> = ({
     onChangeTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
+  const bookDisplayTitle =
+    activeBookId === 'how-to-win-friends'
+      ? 'วิธีชนะมิตรและจูงใจคน'
+      : 'THE DAILY STOIC';
+
   return (
     <header className={`sticky top-0 z-30 border-b transition-colors duration-200 ${t.navBg}`}>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        {/* Brand without logo */}
-        <div
-          onClick={onResetToCurrentDay}
-          className="flex items-center cursor-pointer select-none group"
-          title="The Daily Stoic (366 วันแห่งปัญญา)"
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2">
+        {/* Book Switcher Button (Replaces static title) */}
+        <button
+          onClick={onOpenBookShelf}
+          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer select-none group ${t.cardBorder} ${t.cardBg} ${t.cardBgHover}`}
+          title="สลับหนังสือ / เปิดคลังหนังสือปัญญา"
         >
-          <span className={`font-serif-thai font-bold text-sm sm:text-base tracking-wider leading-none transition-colors group-hover:text-yellow-400 ${t.textPrimary}`}>
-            THE DAILY STOIC
+          <BookOpen className="w-4 h-4 text-yellow-400 shrink-0" />
+          <span className={`font-serif-thai font-bold text-xs sm:text-sm tracking-wide leading-none transition-colors group-hover:text-yellow-400 truncate max-w-[160px] sm:max-w-none ${t.textPrimary}`}>
+            {bookDisplayTitle}
           </span>
-        </div>
+          <ChevronDown className="w-3.5 h-3.5 text-yellow-400 shrink-0 transition-transform group-hover:translate-y-0.5" />
+        </button>
 
         {/* Center / Right Status & Actions */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Subtle Progress / Streak */}
           <div className="flex items-center gap-2 text-xs text-stone-400 font-mono">
             {streak > 0 && (
@@ -57,11 +72,20 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>{streak}</span>
               </span>
             )}
-            <span className="hidden xs:inline text-stone-500">•</span>
-            <span title={`อ่านแล้ว ${readCount}/366 ก้าว`}>
-              ก้าวที่ {currentDayStep}
+            <span className="hidden sm:inline text-stone-500">•</span>
+            <span className="hidden xs:inline" title={`อ่านแล้ว ${readCount}/${totalUnits} ${unitLabel}`}>
+              {unitLabel}ที่ {currentDayStep}/{totalUnits}
             </span>
           </div>
+
+          {/* Quick Shelf Button on Desktop */}
+          <button
+            onClick={onOpenBookShelf}
+            className={`hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-sans-thai font-medium transition-colors cursor-pointer ${t.cardBorder} text-yellow-400 hover:bg-yellow-400/10`}
+            title="เลือกหนังสือเล่มอื่นในคลัง"
+          >
+            <span>สลับเล่ม</span>
+          </button>
 
           {/* Theme switcher */}
           <button
