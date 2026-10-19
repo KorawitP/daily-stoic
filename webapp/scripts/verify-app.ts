@@ -353,12 +353,15 @@ class ReadingBookmarkManager {
     return this.bookmark;
   }
 
-  // 1. Auto-track: advances as user reads forward down the page
-  autoTrack(dayId: number, visibleParaIdx: number, scrollPct?: number) {
+  // 1. Manual Pin & Toggle: user clicks ribbon icon to pin or unpin
+  toggleBookmark(dayId: number, paragraphIndex: number, scrollPercent?: number) {
     const current = this.getBookmark(dayId);
-    if (!current || visibleParaIdx > current.paragraphIndex) {
-      this.setBookmark(dayId, visibleParaIdx, scrollPct);
+    if (current && current.paragraphIndex === paragraphIndex) {
+      this.clearBookmark(dayId);
+      return null;
     }
+    this.setBookmark(dayId, paragraphIndex, scrollPercent);
+    return this.getBookmark(dayId);
   }
 
   // 2. Manual Pin: user clicks ribbon pin next to any paragraph (including paragraph 0)
@@ -388,31 +391,30 @@ class ReadingBookmarkManager {
 
 const bmManager = new ReadingBookmarkManager();
 
-// Scenario 0: User starts reading Day 1 at the very first paragraph (index 0)
-bmManager.autoTrack(1, 0);
-assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 0, 'Auto-track sets bookmark to para 0 (first paragraph)');
+// Scenario 0: User starts reading Day 1, manually pins at paragraph 0
+bmManager.toggleBookmark(1, 0);
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 0, 'Manual pin sets bookmark to para 0 (first paragraph)');
 
-// Scenario 1: User scrolls down to para 3
-bmManager.autoTrack(1, 3);
-assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 3, 'Auto-track advances bookmark to para 3');
+// Scenario 1: User scrolls down to para 3, but did NOT click pin -> bookmark stays safely at para 0!
+// (No unwanted automatic movement while just scrolling or browsing)
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 0, 'Scrolling without clicking does NOT alter bookmark');
 
-// Scenario 2: User continues reading down to para 8
-bmManager.autoTrack(1, 8);
-assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 8, 'Auto-track advances to para 8');
+// Scenario 2: User decides to pause and clicks pin icon at para 4
+bmManager.toggleBookmark(1, 4);
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 4, 'Manual pin sets bookmark to para 4');
 
-// Scenario 3: User scrolls UP to review para 1 -> bookmark remains at furthest read position (para 8)
-// so the floating button [📍 กลับไปจุดที่คั่นไว้ (ย่อหน้าที่ 9)] can guide them back!
-bmManager.autoTrack(1, 1);
-assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 8, 'Scrolling up keeps furthest reading ribbon at para 8');
+// Scenario 3: User clicks the SAME pin icon again at para 4 -> toggles bookmark OFF!
+bmManager.toggleBookmark(1, 4);
+assert.strictEqual(bmManager.getBookmark(1), null, 'Clicking pinned paragraph again removes bookmark');
 
-// Scenario 4: User explicitly clicks manual pin on para 4
-bmManager.setBookmark(1, 4);
-assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 4, 'Manual pin overrides ribbon to para 4');
+// Scenario 4: User re-pins at para 8
+bmManager.setBookmark(1, 8);
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 8, 'Manual pin sets bookmark to para 8');
 
 // Scenario 5: User also reads and bookmarks Day 5 at paragraph 12 (multi-chapter bookmarks)
 bmManager.setBookmark(5, 12);
 assert.strictEqual(bmManager.getBookmark(5)?.paragraphIndex, 12, 'Day 5 bookmark saved');
-assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 4, 'Day 1 bookmark preserved across chapters');
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 8, 'Day 1 bookmark preserved across chapters');
 
 // Scenario 6: User finishes Day 1 and marks read -> only Day 1 is cleared
 bmManager.clearBookmark(1);
@@ -423,7 +425,7 @@ assert.strictEqual(bmManager.getBookmark(5)?.paragraphIndex, 12, 'Day 5 bookmark
 bmManager.clearBookmark();
 assert.strictEqual(bmManager.getBookmark(5), null, 'clearBookmark() clears all bookmarks');
 
-console.log('✓ Smart Bookmark dual-tracking and resume ribbon verified cleanly.');
+console.log('✓ Manual Bookmark pinning, toggle-off, and resume ribbon verified cleanly.');
 
 // Test 10: Bookmark Sanitization & Full Backup V2 Validation
 console.log('[10/10] Verifying Bookmark Sanitization & Backup V2 Validation...');

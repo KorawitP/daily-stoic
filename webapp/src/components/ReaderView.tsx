@@ -55,7 +55,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   disabledKeyboardShortcuts,
   currentBookmark,
   onSetBookmark,
-  onClearBookmark: _onClearBookmark,
+  onClearBookmark,
 }) => {
   const t = getThemeClasses(theme);
 
@@ -68,10 +68,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastScrolledChapterKeyRef = useRef<string | null>(null);
   const isAutoScrollingRef = useRef(false);
-  const lastManualPinTimeRef = useRef(0);
 
   // Smooth Auto-Scroll on chapter/book switch if bookmark exists, otherwise reset to top
   useEffect(() => {
@@ -186,11 +184,20 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
   const handleManualPin = useCallback((idx: number) => {
     if (!onSetBookmark) return;
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
-      scrollTimeoutRef.current = null;
+
+    // Toggle off if already bookmarked at this exact paragraph
+    if (
+      currentBookmark &&
+      currentBookmark.dayId === day.id &&
+      currentBookmark.paragraphIndex === idx
+    ) {
+      if (onClearBookmark) {
+        onClearBookmark(day.id);
+        setToastMessage('ปลดที่คั่นหน้าของบทนี้แล้ว');
+        setTimeout(() => setToastMessage(null), 2200);
+      }
+      return;
     }
-    lastManualPinTimeRef.current = Date.now();
 
     const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
     const scrollPct = maxScroll > 0 ? (window.scrollY / maxScroll) * 100 : 0;
@@ -200,7 +207,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
     setToastMessage(`📍 ปักหมุดคั่นหน้าไว้ที่ย่อหน้าที่ ${idx + 1} แล้ว`);
     setTimeout(() => setToastMessage(null), 2500);
-  }, [day.id, onSetBookmark]);
+  }, [day.id, onSetBookmark, onClearBookmark, currentBookmark]);
 
   const handleScrollToBookmark = useCallback(() => {
     if (!currentBookmark || currentBookmark.dayId !== day.id) return;
@@ -218,10 +225,9 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     }
   }, [currentBookmark, day.id]);
 
-  // Scroll listener for floating resume visibility and debounced auto-tracking
+  // Scroll listener strictly for floating resume button visibility (Manual-only bookmarking)
   useEffect(() => {
     const handleScroll = () => {
-      // 1. Floating button visibility: show when user scrolls away from bookmark
       if (
         currentBookmark &&
         currentBookmark.dayId === day.id &&
@@ -239,48 +245,6 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       } else {
         setShowFloatingResume(false);
       }
-
-      // 2. Debounced auto-track reading position
-      if (isAutoScrollingRef.current) return;
-      if (Date.now() - lastManualPinTimeRef.current < 1200) return;
-
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-      scrollTimeoutRef.current = setTimeout(() => {
-        if (window.scrollY < 200) return;
-
-        const paraElements = document.querySelectorAll<HTMLElement>('[data-para-idx]');
-        if (!paraElements || paraElements.length === 0) return;
-
-        const focusY = 140;
-        let bestIdx: number | null = null;
-        let minDistance = Infinity;
-
-        for (const el of Array.from(paraElements)) {
-          const rect = el.getBoundingClientRect();
-          const pIdx = Number(el.getAttribute('data-para-idx'));
-          if (rect.top <= focusY && rect.bottom >= focusY) {
-            bestIdx = pIdx;
-            break; // Exactly on focal line
-          }
-          const distance = Math.abs(rect.top - focusY);
-          if (distance < minDistance && rect.top <= window.innerHeight * 0.6) {
-            minDistance = distance;
-            bestIdx = pIdx;
-          }
-        }
-
-        if (bestIdx !== null && bestIdx >= 0) {
-          const currentBookmarkedIdx = (currentBookmark && currentBookmark.dayId === day.id)
-            ? currentBookmark.paragraphIndex
-            : -1;
-
-          if (bestIdx > currentBookmarkedIdx && onSetBookmark) {
-            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-            const scrollPct = maxScroll > 0 ? (window.scrollY / maxScroll) * 100 : 0;
-            onSetBookmark(day.id, bestIdx, scrollPct);
-          }
-        }
-      }, 500);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -288,9 +252,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-  }, [day.id, currentBookmark, onSetBookmark]);
+  }, [day.id, currentBookmark]);
 
   const renderParagraphBlock = (para: string, idx: number) => {
     const trimmed = para.trim();
@@ -453,24 +416,44 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                   : ''
               }`}
             >
-              {/* Visual Resume Ribbon ("📍 อ่านถึงตรงนี้ • คลิกเพื่ออ่านต่อ") */}
+              {/* Visual Resume Ribbon ("📍 อ่านถึงตรงนี้") */}
               {isBookmarked && (
                 <div
                   id={`bookmark-ribbon-${day.id}`}
-                  onClick={handleScrollToBookmark}
-                  className="mb-5 -mt-1 relative py-2 flex items-center gap-3 cursor-pointer select-none group"
-                  title="อ่านถึงตรงนี้ • คลิกเพื่อเน้นย่อหน้า"
+                  className="mb-5 -mt-1 relative py-2 flex items-center gap-3 select-none"
                 >
                   <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-yellow-400/60 to-yellow-400" />
-                  <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-yellow-400/15 border border-yellow-400/50 text-yellow-400 text-xs sm:text-sm font-sans-thai shadow-xs group-hover:bg-yellow-400/25 group-hover:border-yellow-400 transition-all">
-                    <BookmarkCheck className="w-4 h-4 text-yellow-400 fill-yellow-400/30" />
-                    <span className="font-semibold tracking-wide">📍 อ่านถึงตรงนี้ • คลิกเพื่ออ่านต่อ</span>
+                  <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-yellow-400/15 border border-yellow-400/50 text-yellow-400 text-xs sm:text-sm font-sans-thai shadow-xs">
+                    <button
+                      type="button"
+                      onClick={handleScrollToBookmark}
+                      className="flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+                      title="คลิกเพื่อเน้นย่อหน้านี้"
+                    >
+                      <BookmarkCheck className="w-4 h-4 text-yellow-400 fill-yellow-400/40 shrink-0" />
+                      <span className="font-semibold tracking-wide">📍 อ่านถึงตรงนี้</span>
+                    </button>
+                    {onClearBookmark && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClearBookmark(day.id);
+                          setToastMessage('ปลดที่คั่นหน้าแล้ว');
+                          setTimeout(() => setToastMessage(null), 2200);
+                        }}
+                        className="ml-1 text-[11px] text-yellow-300/80 hover:text-white px-1.5 py-0.5 rounded-md hover:bg-yellow-400/20 cursor-pointer transition-colors"
+                        title="ยกเลิกที่คั่นหน้านี้"
+                      >
+                        (ปลดออก)
+                      </button>
+                    )}
                   </div>
                   <div className="flex-1 h-[2px] bg-gradient-to-r from-yellow-400 via-yellow-400/60 to-transparent" />
                 </div>
               )}
 
-              {/* Text content with gutter pin button */}
+              {/* Text content with prominent gutter pin button */}
               <div className="relative">
                 <button
                   type="button"
@@ -478,18 +461,26 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                     e.stopPropagation();
                     handleManualPin(idx);
                   }}
-                  className={`absolute -left-6 sm:-left-8 top-1 p-1 rounded-md transition-all duration-150 cursor-pointer ${
+                  className={`absolute -left-7 sm:-left-9 top-0.5 p-1.5 rounded-lg transition-all duration-150 cursor-pointer flex items-center justify-center ${
                     isBookmarked
-                      ? 'text-yellow-400 opacity-100 scale-110'
-                      : 'text-stone-400 hover:text-yellow-400 opacity-40 sm:opacity-0 group-hover/para:opacity-100 hover:scale-110'
+                      ? 'text-yellow-400 bg-yellow-400/15 border border-yellow-400/40 shadow-xs scale-110'
+                      : 'text-stone-500 hover:text-yellow-400 opacity-60 sm:opacity-30 group-hover/para:opacity-100 hover:scale-115 hover:bg-yellow-400/10'
                   }`}
-                  title={isBookmarked ? 'คั่นหน้าอยู่ที่ย่อหน้านี้แล้ว' : `ปักหมุดคั่นหน้าย่อหน้านี้ (ย่อหน้าที่ ${idx + 1})`}
-                  aria-label={`ปักหมุดคั่นหน้าย่อหน้าที่ ${idx + 1}`}
+                  title={
+                    isBookmarked
+                      ? `📍 คั่นหน้าอยู่ที่ย่อหน้านี้แล้ว (คลิกเพื่อยกเลิก)`
+                      : `คลิกเพื่อคั่นหน้าอ่านถึงตรงนี้ (ย่อหน้าที่ ${idx + 1})`
+                  }
+                  aria-label={
+                    isBookmarked
+                      ? `ยกเลิกคั่นหน้าย่อหน้าที่ ${idx + 1}`
+                      : `ปักหมุดคั่นหน้าย่อหน้าที่ ${idx + 1}`
+                  }
                 >
                   {isBookmarked ? (
-                    <BookmarkCheck className="w-4 h-4 text-yellow-400 fill-yellow-400/30" />
+                    <BookmarkCheck className="w-4 h-4 text-yellow-400 fill-yellow-400/40" />
                   ) : (
-                    <Bookmark className="w-3.5 h-3.5 hover:fill-yellow-400/20" />
+                    <Bookmark className="w-3.5 h-3.5" />
                   )}
                 </button>
 
