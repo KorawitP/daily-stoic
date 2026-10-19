@@ -9,8 +9,9 @@ import {
   Upload,
   RotateCcw,
   BookOpen,
+  BookmarkCheck,
 } from 'lucide-react';
-import type { StoicDay, AppTheme, BookId, CarnegieMeta } from '../types/stoic.ts';
+import type { StoicDay, AppTheme, BookId, CarnegieMeta, ReadingBookmark } from '../types/stoic.ts';
 import { getThemeClasses } from '../utils/theme.ts';
 import { renderInlineMarkdown } from '../utils/markdown.tsx';
 
@@ -25,6 +26,8 @@ interface MenuDrawerProps {
   readDays: Record<number, { completedAt: string }>;
   streak: number;
   favorites: number[];
+  bookmarks?: Record<number, ReadingBookmark>;
+  activeBookmark?: ReadingBookmark | null;
   theme: AppTheme;
   onSelectDay: (dayId: number) => void;
   onExportBackup: () => void;
@@ -74,6 +77,8 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
   readDays,
   streak,
   favorites,
+  bookmarks,
+  activeBookmark,
   theme,
   onSelectDay,
   onExportBackup,
@@ -351,6 +356,7 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
                   filteredDays.map(d => {
                     const isCompleted = Boolean(readDays[d.id]);
                     const isCurrent = d.id === currentDayId;
+                    const chapterBookmark = bookmarks?.[d.id] || (activeBookmark?.dayId === d.id ? activeBookmark : null);
 
                     return (
                       <div
@@ -382,6 +388,15 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {chapterBookmark && !isCompleted && typeof chapterBookmark.paragraphIndex === 'number' && chapterBookmark.paragraphIndex >= 0 && (
+                            <span
+                              className="flex items-center gap-1 text-[10px] text-yellow-400 bg-yellow-400/15 border border-yellow-400/30 px-1.5 py-0.5 rounded-md font-sans-thai font-medium"
+                              title={`อ่านค้างไว้ที่ย่อหน้าที่ ${chapterBookmark.paragraphIndex + 1}`}
+                            >
+                              <BookmarkCheck className="w-3 h-3 text-yellow-400" />
+                              <span className="hidden xs:inline">ย่อหน้าที่ {chapterBookmark.paragraphIndex + 1}</span>
+                            </span>
+                          )}
                           {isCompleted && (
                             <CheckCircle2 className="w-4 h-4 text-yellow-400" />
                           )}

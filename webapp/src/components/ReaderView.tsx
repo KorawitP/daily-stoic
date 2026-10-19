@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   CheckCircle2,
   Circle,
   Bookmark,
+  BookmarkCheck,
   ChevronLeft,
   ChevronRight,
   Quote,
@@ -11,7 +12,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import type { StoicDay, AppTheme, BookId } from '../types/stoic.ts';
+import type { StoicDay, AppTheme, BookId, ReadingBookmark } from '../types/stoic.ts';
 import { getThemeClasses } from '../utils/theme.ts';
 import { renderInlineMarkdown } from '../utils/markdown.tsx';
 
@@ -31,8 +32,10 @@ interface ReaderViewProps {
   hasPrev: boolean;
   hasNext: boolean;
   disabledKeyboardShortcuts?: boolean;
+  currentBookmark?: ReadingBookmark | null;
+  onSetBookmark?: (dayId: number, paragraphIndex: number, scrollPercent?: number) => void;
+  onClearBookmark?: (dayId: number) => void;
 }
-
 
 export const ReaderView: React.FC<ReaderViewProps> = ({
   day,
@@ -50,6 +53,9 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   hasPrev,
   hasNext,
   disabledKeyboardShortcuts,
+  currentBookmark,
+  onSetBookmark,
+  onClearBookmark: _onClearBookmark,
 }) => {
   const t = getThemeClasses(theme);
 
@@ -57,12 +63,55 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const [showJournal, setShowJournal] = useState(Boolean(savedNote));
   const [noteText, setNoteText] = useState(savedNote);
   const [isNoteSaved, setIsNoteSaved] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [glowingIndex, setGlowingIndex] = useState<number | null>(null);
+  const [showFloatingResume, setShowFloatingResume] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Scroll to top on mount
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastScrolledChapterKeyRef = useRef<string | null>(null);
+  const isAutoScrollingRef = useRef(false);
+  const lastManualPinTimeRef = useRef(0);
+
+  // Smooth Auto-Scroll on chapter/book switch if bookmark exists, otherwise reset to top
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+    const chapterKey = `${activeBookId}-${day.id}`;
+    if (lastScrolledChapterKeyRef.current === chapterKey) {
+      return;
+    }
+    lastScrolledChapterKeyRef.current = chapterKey;
+
+    if (
+      currentBookmark &&
+      currentBookmark.dayId === day.id &&
+      typeof currentBookmark.paragraphIndex === 'number' &&
+      currentBookmark.paragraphIndex >= 0
+    ) {
+      const targetIdx = currentBookmark.paragraphIndex;
+      isAutoScrollingRef.current = true;
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`para-container-${day.id}-${targetIdx}`);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const targetY = rect.top + window.scrollY - 90;
+          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          setGlowingIndex(targetIdx);
+          setTimeout(() => setGlowingIndex(null), 2200);
+        } else {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+        setTimeout(() => {
+          isAutoScrollingRef.current = false;
+        }, 800);
+      }, 180);
+      return () => {
+        clearTimeout(timer);
+        isAutoScrollingRef.current = false;
+      };
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [day.id, activeBookId, currentBookmark]);
 
   // Flush pending debounced note on unmount / navigation
   const textRef = useRef(noteText);
@@ -134,6 +183,114 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     setIsNoteSaved(true);
     setTimeout(() => setIsNoteSaved(false), 2000);
   };
+
+  const handleManualPin = useCallback((idx: number) => {
+    if (!onSetBookmark) return;
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = null;
+    }
+    lastManualPinTimeRef.current = Date.now();
+
+    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    const scrollPct = maxScroll > 0 ? (window.scrollY / maxScroll) * 100 : 0;
+    onSetBookmark(day.id, idx, scrollPct);
+    setGlowingIndex(idx);
+    setTimeout(() => setGlowingIndex(null), 2200);
+
+    setToastMessage(`📍 ปักหมุดคั่นหน้าไว้ที่ย่อหน้าที่ ${idx + 1} แล้ว`);
+    setTimeout(() => setToastMessage(null), 2500);
+  }, [day.id, onSetBookmark]);
+
+  const handleScrollToBookmark = useCallback(() => {
+    if (!currentBookmark || currentBookmark.dayId !== day.id) return;
+    const el = document.getElementById(`para-container-${day.id}-${currentBookmark.paragraphIndex}`);
+    if (el) {
+      isAutoScrollingRef.current = true;
+      const rect = el.getBoundingClientRect();
+      const targetY = rect.top + window.scrollY - 90;
+      window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+      setGlowingIndex(currentBookmark.paragraphIndex);
+      setTimeout(() => setGlowingIndex(null), 2200);
+      setTimeout(() => {
+        isAutoScrollingRef.current = false;
+      }, 800);
+    }
+  }, [currentBookmark, day.id]);
+
+  // Scroll listener for floating resume visibility and debounced auto-tracking
+  useEffect(() => {
+    const handleScroll = () => {
+      // 1. Floating button visibility: show when user scrolls away from bookmark
+      if (
+        currentBookmark &&
+        currentBookmark.dayId === day.id &&
+        typeof currentBookmark.paragraphIndex === 'number' &&
+        currentBookmark.paragraphIndex >= 0
+      ) {
+        const bookmarkEl = document.getElementById(`para-container-${day.id}-${currentBookmark.paragraphIndex}`);
+        if (bookmarkEl) {
+          const rect = bookmarkEl.getBoundingClientRect();
+          const isOutOfView = rect.top > window.innerHeight - 80 || rect.bottom < 80;
+          setShowFloatingResume(isOutOfView);
+        } else {
+          setShowFloatingResume(false);
+        }
+      } else {
+        setShowFloatingResume(false);
+      }
+
+      // 2. Debounced auto-track reading position
+      if (isAutoScrollingRef.current) return;
+      if (Date.now() - lastManualPinTimeRef.current < 1200) return;
+
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(() => {
+        if (window.scrollY < 200) return;
+
+        const paraElements = document.querySelectorAll<HTMLElement>('[data-para-idx]');
+        if (!paraElements || paraElements.length === 0) return;
+
+        const focusY = 140;
+        let bestIdx: number | null = null;
+        let minDistance = Infinity;
+
+        for (const el of Array.from(paraElements)) {
+          const rect = el.getBoundingClientRect();
+          const pIdx = Number(el.getAttribute('data-para-idx'));
+          if (rect.top <= focusY && rect.bottom >= focusY) {
+            bestIdx = pIdx;
+            break; // Exactly on focal line
+          }
+          const distance = Math.abs(rect.top - focusY);
+          if (distance < minDistance && rect.top <= window.innerHeight * 0.6) {
+            minDistance = distance;
+            bestIdx = pIdx;
+          }
+        }
+
+        if (bestIdx !== null && bestIdx >= 0) {
+          const currentBookmarkedIdx = (currentBookmark && currentBookmark.dayId === day.id)
+            ? currentBookmark.paragraphIndex
+            : -1;
+
+          if (bestIdx > currentBookmarkedIdx && onSetBookmark) {
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollPct = maxScroll > 0 ? (window.scrollY / maxScroll) * 100 : 0;
+            onSetBookmark(day.id, bestIdx, scrollPct);
+          }
+        }
+      }, 500);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, [day.id, currentBookmark, onSetBookmark]);
 
   const renderParagraphBlock = (para: string, idx: number) => {
     const trimmed = para.trim();
@@ -279,8 +436,68 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       </section>
 
       {/* 4. Full Uncut Translation Body */}
-      <section className="space-y-6 my-8 sm:my-10 text-left">
-        {day.paragraphs.map((para, idx) => renderParagraphBlock(para, idx))}
+      <section className="space-y-6 my-8 sm:my-10 text-left pl-6 sm:pl-8 pr-1 relative">
+        {day.paragraphs.map((para, idx) => {
+          const isBookmarked =
+            currentBookmark?.dayId === day.id && currentBookmark.paragraphIndex === idx;
+          const isGlowing = glowingIndex === idx;
+
+          return (
+            <div
+              key={idx}
+              id={`para-container-${day.id}-${idx}`}
+              data-para-idx={idx}
+              className={`relative group/para transition-all duration-700 ${
+                isGlowing
+                  ? 'bg-yellow-400/15 shadow-[0_0_25px_rgba(250,204,21,0.25)] rounded-xl p-3 -m-3 border border-yellow-400/40'
+                  : ''
+              }`}
+            >
+              {/* Visual Resume Ribbon ("📍 อ่านถึงตรงนี้ • คลิกเพื่ออ่านต่อ") */}
+              {isBookmarked && (
+                <div
+                  id={`bookmark-ribbon-${day.id}`}
+                  onClick={handleScrollToBookmark}
+                  className="mb-5 -mt-1 relative py-2 flex items-center gap-3 cursor-pointer select-none group"
+                  title="อ่านถึงตรงนี้ • คลิกเพื่อเน้นย่อหน้า"
+                >
+                  <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-yellow-400/60 to-yellow-400" />
+                  <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-yellow-400/15 border border-yellow-400/50 text-yellow-400 text-xs sm:text-sm font-sans-thai shadow-xs group-hover:bg-yellow-400/25 group-hover:border-yellow-400 transition-all">
+                    <BookmarkCheck className="w-4 h-4 text-yellow-400 fill-yellow-400/30" />
+                    <span className="font-semibold tracking-wide">📍 อ่านถึงตรงนี้ • คลิกเพื่ออ่านต่อ</span>
+                  </div>
+                  <div className="flex-1 h-[2px] bg-gradient-to-r from-yellow-400 via-yellow-400/60 to-transparent" />
+                </div>
+              )}
+
+              {/* Text content with gutter pin button */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleManualPin(idx);
+                  }}
+                  className={`absolute -left-6 sm:-left-8 top-1 p-1 rounded-md transition-all duration-150 cursor-pointer ${
+                    isBookmarked
+                      ? 'text-yellow-400 opacity-100 scale-110'
+                      : 'text-stone-400 hover:text-yellow-400 opacity-40 sm:opacity-0 group-hover/para:opacity-100 hover:scale-110'
+                  }`}
+                  title={isBookmarked ? 'คั่นหน้าอยู่ที่ย่อหน้านี้แล้ว' : `ปักหมุดคั่นหน้าย่อหน้านี้ (ย่อหน้าที่ ${idx + 1})`}
+                  aria-label={`ปักหมุดคั่นหน้าย่อหน้าที่ ${idx + 1}`}
+                >
+                  {isBookmarked ? (
+                    <BookmarkCheck className="w-4 h-4 text-yellow-400 fill-yellow-400/30" />
+                  ) : (
+                    <Bookmark className="w-3.5 h-3.5 hover:fill-yellow-400/20" />
+                  )}
+                </button>
+
+                {renderParagraphBlock(para, idx)}
+              </div>
+            </div>
+          );
+        })}
       </section>
 
       {/* 5. End of Chapter / Meditation: Calm Check-in & Actions */}
@@ -385,6 +602,33 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
           </button>
         </nav>
       </div>
+
+      {/* 7. Floating Quick Resume Button */}
+      {showFloatingResume && currentBookmark && currentBookmark.dayId === day.id && typeof currentBookmark.paragraphIndex === 'number' && currentBookmark.paragraphIndex >= 0 && (
+        <aside
+          aria-label="วาร์ปกลับไปจุดที่คั่นไว้"
+          className="fixed bottom-6 right-4 sm:right-8 z-40 animate-in fade-in slide-in-from-bottom-3 duration-200"
+        >
+          <button
+            onClick={handleScrollToBookmark}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-stone-900/95 dark:bg-stone-800/95 text-yellow-400 border border-yellow-400/50 shadow-2xl backdrop-blur-md hover:bg-stone-800 hover:border-yellow-400 hover:scale-105 active:scale-95 transition-all cursor-pointer font-sans-thai text-xs sm:text-sm group"
+            title={`คลิกเพื่อเลื่อนกลับไปยังจุดที่คั่นไว้ (ย่อหน้าที่ ${currentBookmark.paragraphIndex + 1})`}
+          >
+            <BookmarkCheck className="w-4 h-4 text-yellow-400 group-hover:scale-110 transition-transform" />
+            <span className="font-medium">
+              กลับไปจุดที่คั่นไว้ (ย่อหน้าที่ {currentBookmark.paragraphIndex + 1})
+            </span>
+          </button>
+        </aside>
+      )}
+
+      {/* 8. Transient Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-18 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-stone-900/95 dark:bg-stone-800/95 text-yellow-400 border border-yellow-400/40 shadow-xl backdrop-blur-md text-xs sm:text-sm font-sans-thai flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+          <BookmarkCheck className="w-4 h-4 text-yellow-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </article>
   );
 };

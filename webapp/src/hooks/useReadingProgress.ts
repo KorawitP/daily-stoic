@@ -7,6 +7,7 @@ import type {
   BackupData,
   BookId,
   BookProgressState,
+  ReadingBookmark,
 } from '../types/stoic.ts';
 
 const STORAGE_KEY = 'stoic_reader_progress_v1';
@@ -17,6 +18,43 @@ export const BOOK_TOTAL_UNITS: Record<BookId, number> = {
   'daily-stoic': 366,
   'how-to-win-friends': 30,
 };
+
+export function sanitizeBookmark(b: unknown, maxDays: number): ReadingBookmark | null {
+  if (typeof b !== 'object' || b === null) return null;
+  const candidate = b as Record<string, unknown>;
+  const dayId = Number(candidate.dayId);
+  const paragraphIndex = Number(candidate.paragraphIndex);
+  if (
+    !Number.isInteger(dayId) ||
+    dayId < 1 ||
+    dayId > maxDays ||
+    !Number.isInteger(paragraphIndex) ||
+    paragraphIndex < 0
+  ) {
+    return null;
+  }
+  return {
+    dayId,
+    paragraphIndex,
+    scrollPercent: typeof candidate.scrollPercent === 'number' ? candidate.scrollPercent : undefined,
+    updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : new Date().toISOString(),
+  };
+}
+
+export function sanitizeBookmarks(map: unknown, maxDays: number): Record<number, ReadingBookmark> {
+  if (typeof map !== 'object' || map === null) return {};
+  const res: Record<number, ReadingBookmark> = {};
+  for (const [k, v] of Object.entries(map as Record<string, unknown>)) {
+    const dId = Number(k);
+    if (dId >= 1 && dId <= maxDays) {
+      const sanitized = sanitizeBookmark(v, maxDays);
+      if (sanitized && sanitized.dayId === dId) {
+        res[dId] = sanitized;
+      }
+    }
+  }
+  return res;
+}
 
 export function toLocalDateString(input?: string | number | Date): string {
   if (!input) return '';
@@ -51,6 +89,9 @@ export function computeActiveStreak(streak: number, lastCheckInDate: string): nu
 const DEFAULT_PROGRESS: UserProgress = {
   readDays: {},
   currentJourneyDay: 1,
+  lastActiveDayId: 1,
+  bookmark: null,
+  bookmarks: {},
   streak: 0,
   lastCheckInDate: '',
   favorites: [],
@@ -63,6 +104,9 @@ const DEFAULT_PROGRESS: UserProgress = {
 const DEFAULT_BOOK_PROGRESS: BookProgressState = {
   readDays: {},
   currentJourneyDay: 1,
+  lastActiveDayId: 1,
+  bookmark: null,
+  bookmarks: {},
   favorites: [],
   notes: {},
 };
@@ -86,9 +130,17 @@ export function useReadingProgress() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        const lastActiveDayId = typeof parsed.lastActiveDayId === 'number'
+          ? Math.max(1, Math.min(366, parsed.lastActiveDayId))
+          : (parsed.currentJourneyDay || 1);
+        const bookmark = sanitizeBookmark(parsed.bookmark, 366);
+        const bookmarks = sanitizeBookmarks(parsed.bookmarks, 366);
         return {
           ...DEFAULT_PROGRESS,
           ...parsed,
+          lastActiveDayId,
+          bookmark,
+          bookmarks,
           theme: parsed.theme === 'light' ? 'light' : 'dark',
         };
       }
@@ -104,7 +156,18 @@ export function useReadingProgress() {
       const saved = localStorage.getItem(CARNEGIE_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return { ...DEFAULT_BOOK_PROGRESS, ...parsed };
+        const lastActiveDayId = typeof parsed.lastActiveDayId === 'number'
+          ? Math.max(1, Math.min(30, parsed.lastActiveDayId))
+          : (parsed.currentJourneyDay || 1);
+        const bookmark = sanitizeBookmark(parsed.bookmark, 30);
+        const bookmarks = sanitizeBookmarks(parsed.bookmarks, 30);
+        return {
+          ...DEFAULT_BOOK_PROGRESS,
+          ...parsed,
+          lastActiveDayId,
+          bookmark,
+          bookmarks,
+        };
       }
     } catch (e) {
       console.error('Failed to load carnegie reading progress from localStorage', e);
@@ -153,6 +216,9 @@ export function useReadingProgress() {
         ...stoicProgress,
         readDays: carnegieProgress.readDays,
         currentJourneyDay: carnegieProgress.currentJourneyDay,
+        lastActiveDayId: carnegieProgress.lastActiveDayId,
+        bookmark: carnegieProgress.bookmark,
+        bookmarks: carnegieProgress.bookmarks,
         favorites: carnegieProgress.favorites,
         notes: carnegieProgress.notes,
       };
@@ -195,10 +261,21 @@ export function useReadingProgress() {
           }
         }
 
+        const newBookmarks = { ...(prev.bookmarks || {}) };
+        let newBookmark = prev.bookmark;
+        if (nowRead) {
+          delete newBookmarks[dayId];
+          if (newBookmark && newBookmark.dayId === dayId) {
+            newBookmark = null;
+          }
+        }
+
         return {
           ...prev,
           readDays: newReadDays,
           currentJourneyDay: nextJourneyDay,
+          bookmark: newBookmark,
+          bookmarks: newBookmarks,
         };
       });
 
@@ -267,10 +344,21 @@ export function useReadingProgress() {
         }
       }
 
+      const newBookmarks = { ...(prev.bookmarks || {}) };
+      let newBookmark = prev.bookmark;
+      if (nowRead) {
+        delete newBookmarks[dayId];
+        if (newBookmark && newBookmark.dayId === dayId) {
+          newBookmark = null;
+        }
+      }
+
       return {
         ...prev,
         readDays: newReadDays,
         currentJourneyDay: nextJourneyDay,
+        bookmark: newBookmark,
+        bookmarks: newBookmarks,
         streak: newStreak,
         lastCheckInDate: newLastCheckInDate,
       };
@@ -363,10 +451,113 @@ export function useReadingProgress() {
     const maxUnits = BOOK_TOTAL_UNITS[activeBookId];
     const clamped = Math.max(1, Math.min(maxUnits, day));
     if (activeBookId === 'how-to-win-friends') {
-      setCarnegieProgress(prev => ({ ...prev, currentJourneyDay: clamped }));
+      setCarnegieProgress(prev => ({
+        ...prev,
+        currentJourneyDay: clamped,
+        lastActiveDayId: clamped,
+      }));
       return;
     }
-    setStoicProgress(prev => ({ ...prev, currentJourneyDay: clamped }));
+    setStoicProgress(prev => ({
+      ...prev,
+      currentJourneyDay: clamped,
+      lastActiveDayId: clamped,
+    }));
+  }, [activeBookId]);
+
+  const setLastActiveDayId = useCallback((dayId: number) => {
+    const maxUnits = BOOK_TOTAL_UNITS[activeBookId];
+    if (dayId < 1 || dayId > maxUnits) return;
+    if (activeBookId === 'how-to-win-friends') {
+      setCarnegieProgress(prev => {
+        if (prev.lastActiveDayId === dayId) return prev;
+        return { ...prev, lastActiveDayId: dayId };
+      });
+    } else {
+      setStoicProgress(prev => {
+        if (prev.lastActiveDayId === dayId) return prev;
+        return { ...prev, lastActiveDayId: dayId };
+      });
+    }
+  }, [activeBookId]);
+
+  const getBookmark = useCallback((dayId?: number): ReadingBookmark | null => {
+    const currentProg = activeBookId === 'how-to-win-friends' ? carnegieProgress : stoicProgress;
+    if (typeof dayId === 'number') {
+      if (currentProg.bookmarks && currentProg.bookmarks[dayId]) {
+        return currentProg.bookmarks[dayId];
+      }
+      if (currentProg.bookmark && currentProg.bookmark.dayId === dayId) {
+        return currentProg.bookmark;
+      }
+      return null;
+    }
+    return currentProg.bookmark || null;
+  }, [activeBookId, carnegieProgress, stoicProgress]);
+
+  const setBookmark = useCallback((dayId: number, paragraphIndex: number, scrollPercent?: number) => {
+    const maxUnits = BOOK_TOTAL_UNITS[activeBookId];
+    if (dayId < 1 || dayId > maxUnits || paragraphIndex < 0) return;
+    const newBookmark: ReadingBookmark = {
+      dayId,
+      paragraphIndex,
+      scrollPercent: typeof scrollPercent === 'number' ? Math.round(scrollPercent) : undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (activeBookId === 'how-to-win-friends') {
+      setCarnegieProgress(prev => ({
+        ...prev,
+        lastActiveDayId: dayId,
+        bookmark: newBookmark,
+        bookmarks: {
+          ...(prev.bookmarks || {}),
+          [dayId]: newBookmark,
+        },
+      }));
+    } else {
+      setStoicProgress(prev => ({
+        ...prev,
+        lastActiveDayId: dayId,
+        bookmark: newBookmark,
+        bookmarks: {
+          ...(prev.bookmarks || {}),
+          [dayId]: newBookmark,
+        },
+      }));
+    }
+  }, [activeBookId]);
+
+  const clearBookmark = useCallback((dayId?: number) => {
+    if (activeBookId === 'how-to-win-friends') {
+      setCarnegieProgress(prev => {
+        const newBookmarks = { ...(prev.bookmarks || {}) };
+        const targetDayId = typeof dayId === 'number' ? dayId : prev.bookmark?.dayId;
+        if (typeof targetDayId === 'number') {
+          delete newBookmarks[targetDayId];
+        }
+        const shouldClearMain = !dayId || (prev.bookmark && prev.bookmark.dayId === targetDayId);
+        return {
+          ...prev,
+          bookmark: shouldClearMain ? null : prev.bookmark,
+          bookmarks: !dayId ? {} : newBookmarks,
+        };
+      });
+    } else {
+      setStoicProgress(prev => {
+        const newBookmarks = { ...(prev.bookmarks || {}) };
+        const targetDayId = typeof dayId === 'number' ? dayId : prev.bookmark?.dayId;
+        if (typeof targetDayId === 'number') {
+          delete newBookmarks[targetDayId];
+        }
+        const shouldClearMain = !dayId || (prev.bookmark && prev.bookmark.dayId === targetDayId);
+        return {
+          ...prev,
+          bookmark: shouldClearMain ? null : prev.bookmark,
+          bookmarks: !dayId ? {} : newBookmarks,
+        };
+      });
+    }
   }, [activeBookId]);
 
   const exportData = useCallback((): string => {
@@ -418,11 +609,19 @@ export function useReadingProgress() {
         }
       }
 
+      const cJourney = typeof candidateProgress.currentJourneyDay === 'number'
+        ? Math.max(1, Math.min(366, candidateProgress.currentJourneyDay))
+        : 1;
+      const cLastActive = typeof candidateProgress.lastActiveDayId === 'number'
+        ? Math.max(1, Math.min(366, candidateProgress.lastActiveDayId))
+        : cJourney;
+
       const newStoicProgress: UserProgress = {
         readDays,
-        currentJourneyDay: typeof candidateProgress.currentJourneyDay === 'number'
-          ? Math.max(1, Math.min(366, candidateProgress.currentJourneyDay))
-          : 1,
+        currentJourneyDay: cJourney,
+        lastActiveDayId: cLastActive,
+        bookmark: sanitizeBookmark(candidateProgress.bookmark, 366),
+        bookmarks: sanitizeBookmarks(candidateProgress.bookmarks, 366),
         streak: typeof candidateProgress.streak === 'number' ? Math.max(0, candidateProgress.streak) : 0,
         lastCheckInDate: typeof candidateProgress.lastCheckInDate === 'string' ? candidateProgress.lastCheckInDate : '',
         favorites,
@@ -459,17 +658,27 @@ export function useReadingProgress() {
             }
           }
         }
-        const cJourney = typeof cp.currentJourneyDay === 'number'
+        const cpJourney = typeof cp.currentJourneyDay === 'number'
           ? Math.max(1, Math.min(30, cp.currentJourneyDay))
           : 1;
+        const cpLastActive = typeof cp.lastActiveDayId === 'number'
+          ? Math.max(1, Math.min(30, cp.lastActiveDayId))
+          : cpJourney;
 
         setCarnegieProgress({
           readDays: cReadDays,
-          currentJourneyDay: cJourney,
+          currentJourneyDay: cpJourney,
+          lastActiveDayId: cpLastActive,
+          bookmark: sanitizeBookmark(cp.bookmark, 30),
+          bookmarks: sanitizeBookmarks(cp.bookmarks, 30),
           favorites: cFavs,
           notes: cNotes,
         });
       }
+
+      const targetBookId: BookId = (data.activeBookId === 'how-to-win-friends' || data.activeBookId === 'daily-stoic')
+        ? data.activeBookId
+        : activeBookId;
 
       if (data.activeBookId === 'how-to-win-friends' || data.activeBookId === 'daily-stoic') {
         setActiveBookIdState(data.activeBookId);
@@ -477,9 +686,9 @@ export function useReadingProgress() {
 
       return {
         success: true,
-        newJourneyDay: activeBookId === 'how-to-win-friends' && data.carnegieProgress
-          ? data.carnegieProgress.currentJourneyDay || 1
-          : newStoicProgress.currentJourneyDay,
+        newJourneyDay: targetBookId === 'how-to-win-friends' && data.carnegieProgress
+          ? (data.carnegieProgress.lastActiveDayId || data.carnegieProgress.currentJourneyDay || 1)
+          : (newStoicProgress.lastActiveDayId || newStoicProgress.currentJourneyDay),
       };
     } catch (e) {
       return { success: false, error: (e as Error).message || 'ไม่สามารถอ่านไฟล์ JSON ได้' };
@@ -542,6 +751,10 @@ export function useReadingProgress() {
     setFontSize,
     setReadingMode,
     setCurrentJourneyDay,
+    setLastActiveDayId,
+    getBookmark,
+    setBookmark,
+    clearBookmark,
     readCount,
     totalUnits,
     progressPercent,

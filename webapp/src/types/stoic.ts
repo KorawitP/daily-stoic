@@ -93,6 +93,13 @@ export interface CarnegieMeta {
   biographyAndSummary: string;
 }
 
+export interface ReadingBookmark {
+  dayId: number;
+  paragraphIndex: number;
+  scrollPercent?: number;
+  updatedAt: string; // ISO string
+}
+
 export interface DayProgress {
   completedAt: string; // ISO string
 }
@@ -100,6 +107,9 @@ export interface DayProgress {
 export interface BookProgressState {
   readDays: Record<number, DayProgress>;
   currentJourneyDay: number;
+  lastActiveDayId?: number;
+  bookmark?: ReadingBookmark | null;
+  bookmarks?: Record<number, ReadingBookmark>;
   favorites: number[];
   notes: Record<number, string>;
 }
@@ -107,6 +117,9 @@ export interface BookProgressState {
 export interface UserProgress {
   readDays: Record<number, DayProgress>; // dayId -> progress (active book or daily-stoic legacy)
   currentJourneyDay: number;
+  lastActiveDayId?: number;
+  bookmark?: ReadingBookmark | null;
+  bookmarks?: Record<number, ReadingBookmark>;
   streak: number;
   lastCheckInDate: string; // YYYY-MM-DD
   favorites: number[]; // day IDs

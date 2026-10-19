@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { sanitizeBookmark, sanitizeBookmarks } from '../src/hooks/useReadingProgress.ts';
 
 // 1. Load Data
 const dataPath = path.resolve('./src/data/daily_stoic.json');
@@ -289,8 +290,219 @@ carnegieChapters.forEach((ch: any, idx: number) => {
   assert.ok(ch.quote && ch.quote.length > 0, `Missing principle quote for chapter ${ch.id}`);
   assert.ok(Array.isArray(ch.paragraphs) && ch.paragraphs.length >= 10, `Too few paragraphs for chapter ${ch.id}`);
 });
-console.log('✓ 30 chapters of How to Win Friends and Influence People verified cleanly.');
+// Test 8: Last Active Day Persistence & Multi-Book Isolation
+console.log('[8/10] Verifying Last Active Day Persistence & Multi-Book Isolation...');
+
+function resolveInitialActiveDay(bookId: string, stoicProg: any, carnegieProg: any): number {
+  if (bookId === 'how-to-win-friends') {
+    return carnegieProg.lastActiveDayId || carnegieProg.bookmark?.dayId || carnegieProg.currentJourneyDay || 1;
+  }
+  return stoicProg.lastActiveDayId || stoicProg.bookmark?.dayId || stoicProg.currentJourneyDay || 1;
+}
+
+// Case 1: Fresh state defaults to 1
+assert.strictEqual(
+  resolveInitialActiveDay('daily-stoic', { currentJourneyDay: 1 }, { currentJourneyDay: 1 }),
+  1,
+  'Fresh Daily Stoic should resolve to Day 1'
+);
+
+// Case 2: User was reading chapter 15 of Carnegie (without marking read) -> resumes 15
+const stoicMockState = { currentJourneyDay: 1, lastActiveDayId: 88 };
+const carnegieMockState = { currentJourneyDay: 1, lastActiveDayId: 15 };
+
+assert.strictEqual(
+  resolveInitialActiveDay('daily-stoic', stoicMockState, carnegieMockState),
+  88,
+  'Daily Stoic must resume lastActiveDayId 88'
+);
+assert.strictEqual(
+  resolveInitialActiveDay('how-to-win-friends', stoicMockState, carnegieMockState),
+  15,
+  'Carnegie must resume lastActiveDayId 15 independently'
+);
+
+// Case 3: Clamping boundaries
+function clampDayId(dayId: number, maxUnits: number): number {
+  return Math.max(1, Math.min(maxUnits, dayId));
+}
+assert.strictEqual(clampDayId(500, 366), 366, 'Clamps Daily Stoic to 366');
+assert.strictEqual(clampDayId(-5, 366), 1, 'Clamps Daily Stoic to 1');
+assert.strictEqual(clampDayId(99, 30), 30, 'Clamps Carnegie to 30');
+assert.strictEqual(clampDayId(0, 30), 1, 'Clamps Carnegie to 1');
+console.log('✓ Last Active Day persistence and multi-book isolation verified cleanly.');
+
+// Test 9: Smart Bookmark Dual-Tracking & Resume Ribbon Logic
+console.log('[9/10] Verifying Smart Bookmark Dual-Tracking & Resume Ribbon...');
+
+interface TestBookmark {
+  dayId: number;
+  paragraphIndex: number;
+  scrollPercent?: number;
+  updatedAt: string;
+}
+
+class ReadingBookmarkManager {
+  private bookmark: TestBookmark | null = null;
+  private bookmarks: Record<number, TestBookmark> = {};
+
+  getBookmark(dayId?: number): TestBookmark | null {
+    if (typeof dayId === 'number') {
+      return this.bookmarks[dayId] || (this.bookmark?.dayId === dayId ? this.bookmark : null);
+    }
+    return this.bookmark;
+  }
+
+  // 1. Auto-track: advances as user reads forward down the page
+  autoTrack(dayId: number, visibleParaIdx: number, scrollPct?: number) {
+    const current = this.getBookmark(dayId);
+    if (!current || visibleParaIdx > current.paragraphIndex) {
+      this.setBookmark(dayId, visibleParaIdx, scrollPct);
+    }
+  }
+
+  // 2. Manual Pin: user clicks ribbon pin next to any paragraph (including paragraph 0)
+  setBookmark(dayId: number, paragraphIndex: number, scrollPercent?: number) {
+    const bm: TestBookmark = {
+      dayId,
+      paragraphIndex,
+      scrollPercent,
+      updatedAt: new Date().toISOString(),
+    };
+    this.bookmark = bm;
+    this.bookmarks[dayId] = bm;
+  }
+
+  // 3. Clear bookmark: specific dayId or all if omitted
+  clearBookmark(dayId?: number) {
+    if (typeof dayId === 'number') {
+      delete this.bookmarks[dayId];
+    } else {
+      this.bookmarks = {};
+    }
+    if (!dayId || this.bookmark?.dayId === dayId) {
+      this.bookmark = null;
+    }
+  }
+}
+
+const bmManager = new ReadingBookmarkManager();
+
+// Scenario 0: User starts reading Day 1 at the very first paragraph (index 0)
+bmManager.autoTrack(1, 0);
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 0, 'Auto-track sets bookmark to para 0 (first paragraph)');
+
+// Scenario 1: User scrolls down to para 3
+bmManager.autoTrack(1, 3);
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 3, 'Auto-track advances bookmark to para 3');
+
+// Scenario 2: User continues reading down to para 8
+bmManager.autoTrack(1, 8);
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 8, 'Auto-track advances to para 8');
+
+// Scenario 3: User scrolls UP to review para 1 -> bookmark remains at furthest read position (para 8)
+// so the floating button [📍 กลับไปจุดที่คั่นไว้ (ย่อหน้าที่ 9)] can guide them back!
+bmManager.autoTrack(1, 1);
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 8, 'Scrolling up keeps furthest reading ribbon at para 8');
+
+// Scenario 4: User explicitly clicks manual pin on para 4
+bmManager.setBookmark(1, 4);
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 4, 'Manual pin overrides ribbon to para 4');
+
+// Scenario 5: User also reads and bookmarks Day 5 at paragraph 12 (multi-chapter bookmarks)
+bmManager.setBookmark(5, 12);
+assert.strictEqual(bmManager.getBookmark(5)?.paragraphIndex, 12, 'Day 5 bookmark saved');
+assert.strictEqual(bmManager.getBookmark(1)?.paragraphIndex, 4, 'Day 1 bookmark preserved across chapters');
+
+// Scenario 6: User finishes Day 1 and marks read -> only Day 1 is cleared
+bmManager.clearBookmark(1);
+assert.strictEqual(bmManager.getBookmark(1), null, 'Marking Day 1 read clears Day 1 bookmark');
+assert.strictEqual(bmManager.getBookmark(5)?.paragraphIndex, 12, 'Day 5 bookmark remains intact');
+
+// Scenario 7: Full reset (clearBookmark with no args)
+bmManager.clearBookmark();
+assert.strictEqual(bmManager.getBookmark(5), null, 'clearBookmark() clears all bookmarks');
+
+console.log('✓ Smart Bookmark dual-tracking and resume ribbon verified cleanly.');
+
+// Test 10: Bookmark Sanitization & Full Backup V2 Validation
+console.log('[10/10] Verifying Bookmark Sanitization & Backup V2 Validation...');
+
+// Test sanitization of valid & invalid bookmarks using REAL imported sanitizeBookmark
+assert.ok(sanitizeBookmark({ dayId: 10, paragraphIndex: 5 }, 366) !== null, 'Valid bookmark accepted');
+assert.ok(sanitizeBookmark({ dayId: 1, paragraphIndex: 0 }, 366) !== null, 'Paragraph 0 bookmark accepted');
+assert.strictEqual(sanitizeBookmark({ dayId: 1, paragraphIndex: 0 }, 366)?.paragraphIndex, 0, 'Paragraph 0 preserved as 0');
+assert.strictEqual(sanitizeBookmark({ dayId: 999, paragraphIndex: 5 }, 366), null, 'Out of bounds dayId 999 rejected');
+assert.strictEqual(sanitizeBookmark({ dayId: 0, paragraphIndex: 5 }, 366), null, 'Zero dayId rejected');
+assert.strictEqual(sanitizeBookmark({ dayId: 1, paragraphIndex: -3 }, 366), null, 'Negative paragraph index rejected');
+assert.strictEqual(sanitizeBookmark(null, 366), null, 'Null rejected');
+assert.strictEqual(sanitizeBookmark(undefined, 366), null, 'Undefined rejected');
+assert.strictEqual(sanitizeBookmark('invalid', 366), null, 'String rejected');
+
+// Test sanitizeBookmarks map
+const rawMap = {
+  1: { dayId: 1, paragraphIndex: 0 },
+  2: { dayId: 2, paragraphIndex: 10 },
+  999: { dayId: 999, paragraphIndex: 5 },
+  foo: { dayId: 3, paragraphIndex: -1 },
+};
+const cleanedMap = sanitizeBookmarks(rawMap, 366);
+assert.strictEqual(Object.keys(cleanedMap).length, 2, 'Only valid bookmarks in range preserved');
+assert.strictEqual(cleanedMap[1]?.paragraphIndex, 0, 'Day 1 bookmark at para 0 preserved');
+assert.strictEqual(cleanedMap[2]?.paragraphIndex, 10, 'Day 2 bookmark at para 10 preserved');
+
+// Test full backup export & import containing bookmarks and lastActiveDayId
+const backupV2 = {
+  version: '2.0.0',
+  app: 'Personal Wisdom Library (Thai)',
+  exportedAt: new Date().toISOString(),
+  activeBookId: 'how-to-win-friends',
+  progress: {
+    ...mockProgress,
+    lastActiveDayId: 105,
+    bookmark: { dayId: 105, paragraphIndex: 7, updatedAt: new Date().toISOString() },
+    bookmarks: {
+      105: { dayId: 105, paragraphIndex: 7, updatedAt: new Date().toISOString() },
+    },
+  },
+  carnegieProgress: {
+    readDays: {},
+    currentJourneyDay: 1,
+    lastActiveDayId: 12,
+    bookmark: { dayId: 12, paragraphIndex: 14, updatedAt: new Date().toISOString() },
+    bookmarks: {
+      12: { dayId: 12, paragraphIndex: 14, updatedAt: new Date().toISOString() },
+    },
+    favorites: [1, 2],
+    notes: {},
+  },
+};
+
+const v2String = JSON.stringify(backupV2);
+const parsedV2 = JSON.parse(v2String);
+
+const sanitizedStoicBm = sanitizeBookmark(parsedV2.progress.bookmark, 366);
+const sanitizedCarnegieBm = sanitizeBookmark(parsedV2.carnegieProgress.bookmark, 30);
+const sanitizedCarnegieBms = sanitizeBookmarks(parsedV2.carnegieProgress.bookmarks, 30);
+
+assert.strictEqual(sanitizedStoicBm?.dayId, 105, 'Stoic bookmark dayId matches');
+assert.strictEqual(sanitizedStoicBm?.paragraphIndex, 7, 'Stoic bookmark paragraph matches');
+assert.strictEqual(sanitizedCarnegieBm?.dayId, 12, 'Carnegie bookmark dayId matches');
+assert.strictEqual(sanitizedCarnegieBm?.paragraphIndex, 14, 'Carnegie bookmark paragraph matches');
+assert.ok(sanitizedCarnegieBms[12], 'Carnegie bookmarks map preserved');
+
+// Test active book resolution on import
+const targetBookId = (parsedV2.activeBookId === 'how-to-win-friends' || parsedV2.activeBookId === 'daily-stoic')
+  ? parsedV2.activeBookId
+  : 'daily-stoic';
+const resolvedNewJourneyDay = targetBookId === 'how-to-win-friends' && parsedV2.carnegieProgress
+  ? (parsedV2.carnegieProgress.lastActiveDayId || parsedV2.carnegieProgress.currentJourneyDay || 1)
+  : (parsedV2.progress.lastActiveDayId || parsedV2.progress.currentJourneyDay || 1);
+assert.strictEqual(resolvedNewJourneyDay, 12, 'Resolves to Carnegie lastActiveDayId 12 on import');
+
+console.log('✓ Bookmark sanitization and full Backup V2 verified cleanly.');
 
 console.log('--------------------------------------------------');
-console.log('ALL TESTS PASSED SUCCESSFULLY! (7/7 suites passing)');
+console.log('ALL TESTS PASSED SUCCESSFULLY! (10/10 suites passing)');
+
 

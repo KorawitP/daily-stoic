@@ -32,6 +32,10 @@ export function App() {
     getNote,
     setTheme,
     setCurrentJourneyDay,
+    setLastActiveDayId,
+    getBookmark,
+    setBookmark,
+    clearBookmark,
     readCount,
     totalUnits,
     exportData,
@@ -39,9 +43,17 @@ export function App() {
     resetProgress,
   } = useReadingProgress();
 
-  const [activeDayId, setActiveDayId] = useState<number>(progress.currentJourneyDay || 1);
+  const [activeDayId, setActiveDayId] = useState<number>(() => {
+    const cur = activeBookId === 'how-to-win-friends' ? carnegieProgress : stoicProgress;
+    return cur.lastActiveDayId || cur.bookmark?.dayId || cur.currentJourneyDay || 1;
+  });
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [isBookShelfOpen, setIsBookShelfOpen] = useState<boolean>(false);
+
+  // Sync last active day whenever activeDayId changes
+  useEffect(() => {
+    setLastActiveDayId(activeDayId);
+  }, [activeDayId, setLastActiveDayId]);
 
   const t = getThemeClasses(progress.theme);
   const daysData = activeBookId === 'how-to-win-friends' ? carnegieDaysData : stoicDaysData;
@@ -76,15 +88,14 @@ export function App() {
 
   const handleSelectBook = (bookId: BookId) => {
     setActiveBookId(bookId);
-    const targetJourneyDay =
-      bookId === 'how-to-win-friends'
-        ? carnegieProgress.currentJourneyDay || 1
-        : stoicProgress.currentJourneyDay || 1;
-    setActiveDayId(targetJourneyDay);
+    const targetProg = bookId === 'how-to-win-friends' ? carnegieProgress : stoicProgress;
+    const targetDay = targetProg.lastActiveDayId || targetProg.bookmark?.dayId || targetProg.currentJourneyDay || 1;
+    setActiveDayId(targetDay);
   };
 
   const handleSelectDay = (dayId: number) => {
     setActiveDayId(dayId);
+    setLastActiveDayId(dayId);
     setCurrentJourneyDay(dayId);
     setIsMenuOpen(false);
   };
@@ -93,6 +104,7 @@ export function App() {
     if (activeDayId > 1) {
       const prev = activeDayId - 1;
       setActiveDayId(prev);
+      setLastActiveDayId(prev);
       setCurrentJourneyDay(prev);
     }
   };
@@ -102,6 +114,7 @@ export function App() {
     if (activeDayId < maxUnits) {
       const next = activeDayId + 1;
       setActiveDayId(next);
+      setLastActiveDayId(next);
       setCurrentJourneyDay(next);
     }
   };
@@ -161,6 +174,9 @@ export function App() {
           unitLabel={unitLabel}
           theme={progress.theme}
           isRead={isRead(currentDay.id)}
+          currentBookmark={getBookmark(currentDay.id)}
+          onSetBookmark={setBookmark}
+          onClearBookmark={clearBookmark}
           onToggleRead={() => {
             const nowRead = toggleRead(currentDay.id);
             if (nowRead && activeDayId === progress.currentJourneyDay && activeDayId < totalUnits) {
@@ -191,6 +207,8 @@ export function App() {
         readDays={progress.readDays}
         streak={progress.streak}
         favorites={progress.favorites}
+        bookmarks={progress.bookmarks}
+        activeBookmark={progress.bookmark}
         theme={progress.theme}
         onSelectDay={handleSelectDay}
         onExportBackup={handleExportBackup}
@@ -208,9 +226,9 @@ export function App() {
         activeBookId={activeBookId}
         onSelectBook={handleSelectBook}
         stoicReadCount={stoicReadCount}
-        stoicCurrentDay={stoicProgress.currentJourneyDay || 1}
+        stoicCurrentDay={stoicProgress.lastActiveDayId || stoicProgress.currentJourneyDay || 1}
         carnegieReadCount={carnegieReadCount}
-        carnegieCurrentDay={carnegieProgress.currentJourneyDay || 1}
+        carnegieCurrentDay={carnegieProgress.lastActiveDayId || carnegieProgress.currentJourneyDay || 1}
         theme={progress.theme}
       />
     </div>
